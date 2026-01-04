@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { QuotationData, QuotationSnapshot, CalculatorState } from '../types';
+import { QuotationData, QuotationSnapshot, CalculatorState, PaymentBankDetails } from '../types';
 import { DestinationIcon, DurationIcon, CalendarIcon, MealIcon, VehicleIcon } from './Icons';
 import { getPartnerBannerBase64 } from '../services/imageService';
 import { auditItinerary } from '../services/geminiService';
@@ -24,6 +24,7 @@ interface QuotationPreviewProps {
     financialState: CalculatorState | null; // Improved typing
     clientName?: string;
     onSyncName?: () => void;
+    paymentDetails: PaymentBankDetails;
 }
 
 const EditableField: React.FC<{ value: string | number; onSave: (newValue: string) => void; className?: string; isNumeric?: boolean }> = ({ value, onSave, className, isNumeric = false }) => {
@@ -62,7 +63,8 @@ const QuotationPreview: React.FC<QuotationPreviewProps> = ({
     onSyncDrive,
     financialState,
     clientName,
-    onSyncName
+    onSyncName,
+    paymentDetails
 }) => {
     // Use the specific URL requested for the header
     const HEADER_IMG_URL = "https://res.cloudinary.com/dnauowwb0/image/upload/v1765680866/Trip-Explore-Banner_ejp9hh.png";
@@ -200,7 +202,7 @@ const QuotationPreview: React.FC<QuotationPreviewProps> = ({
             }
 
             const folderId = await ensureFolderStructure(data.customerName, data.destination);
-            const htmlContent = generateQuotationHtml(data);
+            const htmlContent = generateQuotationHtml(data, paymentDetails);
             const fileName = `${data.customerName.replace(/\s+/g, '_')}`;
 
             const result = await createGoogleDocFromHtml(folderId, htmlContent, fileName);
@@ -254,7 +256,7 @@ const QuotationPreview: React.FC<QuotationPreviewProps> = ({
             // Generate DOCX file
             let docxBlob: Blob;
             try {
-                docxBlob = await createDocx(data);
+                docxBlob = await createDocx(data, paymentDetails);
             } catch (docxError: any) {
                 console.error('DOCX Generation Error:', docxError);
                 throw new Error(`Failed to generate DOCX: ${docxError?.message || 'Unknown error during document generation'}`);
@@ -742,36 +744,36 @@ const QuotationPreview: React.FC<QuotationPreviewProps> = ({
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                             <div>
                                 <p className="text-gray-500 text-xs uppercase font-bold tracking-widest mb-1">Account Holder</p>
-                                <p className="font-bold text-xl text-blue-900">tripexplore.in</p>
+                                <p className="font-bold text-xl text-blue-900">{paymentDetails.accountHolder}</p>
                             </div>
                             <div>
                                 <p className="text-gray-500 text-xs uppercase font-bold tracking-widest mb-1">Account Number</p>
-                                <p className="font-bold font-mono text-2xl">2612421112</p>
+                                <p className="font-bold font-mono text-2xl">{paymentDetails.accountNumber}</p>
                             </div>
                             <div>
                                 <p className="text-gray-500 text-xs uppercase font-bold tracking-widest mb-1">Bank Name</p>
-                                <p className="font-bold text-xl">Kotak Mahindra Bank</p>
+                                <p className="font-bold text-xl">{paymentDetails.bankName}</p>
                             </div>
                             <div>
                                 <p className="text-gray-500 text-xs uppercase font-bold tracking-widest mb-1">IFSC Code</p>
-                                <p className="font-bold font-mono text-xl text-red-700">KKBK0000463</p>
+                                <p className="font-bold font-mono text-xl text-red-700">{paymentDetails.ifscCode}</p>
                             </div>
                             <div>
                                 <p className="text-gray-500 text-xs uppercase font-bold tracking-widest mb-1">Account Type</p>
-                                <p className="font-bold">Current Account</p>
+                                <p className="font-bold">{paymentDetails.accountType}</p>
                             </div>
                         </div>
                         <div className="border-t-2 border-dashed border-gray-300 my-8 pt-6 text-center">
                             <p className="font-bold text-gray-400 text-sm mb-2">SCAN & PAY OR GPAY</p>
-                            <p className="font-bold text-3xl text-green-700">GPAY: 9841291289</p>
+                            <p className="font-bold text-3xl text-green-700">GPAY: {paymentDetails.gpayNumber}</p>
                         </div>
                     </div>
 
                     <div className="space-y-6 text-center text-gray-800 mt-16" style={{ fontSize: '14pt' }}>
                         <p className="italic text-gray-500">📞 For further details or booking confirmation, feel free to contact us anytime.</p>
                         <p className="font-bold text-xl">💌 Best Regards,</p>
-                        <p className="font-black text-3xl text-blue-900 tracking-tight">Vishwanathan</p>
-                        <p className="text-blue-700 font-bold">+91-8884016046</p>
+                        <p className="font-black text-3xl text-blue-900 tracking-tight">{paymentDetails.accountHolder}</p>
+                        <p className="text-blue-700 font-bold">{paymentDetails.gpayNumber}</p>
 
                         <div className="flex justify-center gap-6 mt-6">
                             <a href="tel:8884016046" className="hover:scale-105 transition">

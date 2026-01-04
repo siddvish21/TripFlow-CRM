@@ -272,3 +272,19 @@ export interface Template {
     fileData: string; // Base64 string
     createdAt: number;
 }
+
+export interface PaymentBankDetails {
+    accountHolder: string;
+    accountNumber: string;
+    bankName: string;
+    ifscCode: string;
+    accountType: string;
+    gpayNumber: string;
+    companyName: string;
+}
+
+export interface UserSettings {
+    companyName: string;
+    paymentDetails: PaymentBankDetails;
+}
+

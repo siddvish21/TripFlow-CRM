@@ -22,6 +22,8 @@ import PaymentReceiptGenerator from './components/PaymentReceiptGenerator';
 import QuotationAIAssistant from './components/QuotationAIAssistant';
 
 import QuoteSummary from './components/QuoteSummary';
+import PaymentSettings from './components/PaymentSettings';
+import { PaymentBankDetails, UserSettings } from './types';
 import { generateQuotationFromText, parseExistingQuotationText, parseFinancialImage } from './services/geminiService';
 import { createDocx } from './services/docxGenerator';
 import { generateFinancialExcel, generateQuotationExcelFromTemplate } from './services/excelGenerator';
@@ -31,6 +33,16 @@ import { listFiles, findFolder, ensureFolderStructure } from './services/googleD
 import FileSaver from 'file-saver';
 
 // Initial States
+const initialPaymentBankDetails: PaymentBankDetails = {
+    accountHolder: 'tripexplore.in',
+    accountNumber: '2612421112',
+    bankName: 'Kotak Mahindra Bank',
+    ifscCode: 'KKBK0000463',
+    accountType: 'Current Account',
+    gpayNumber: '9841291289',
+    companyName: 'TripExplore'
+};
+
 const initialCalculatorState: CalculatorState = {
     configs: {
         block1: { pax: 2, markupPct: 0, gstPct: 5, tcsPct: 5 },
@@ -81,10 +93,19 @@ const App: React.FC = () => {
     // Unsaved Changes and Modal State
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
     const [showConfirmModal, setShowConfirmModal] = useState(false);
+    const [showSettingsModal, setShowSettingsModal] = useState(false);
+    const [isSetupMode, setIsSetupMode] = useState(false);
 
     // Data State
     const [leads, setLeads] = useState<Lead[]>([]);
     const [currentLead, setCurrentLead] = useState<Lead | null>(null);
+
+    // Settings
+    const [userSettings, setUserSettings] = useState<UserSettings>(() => {
+        const saved = localStorage.getItem('tf_user_settings');
+        if (saved) return JSON.parse(saved);
+        return { companyName: 'TripExplore', paymentDetails: initialPaymentBankDetails };
+    });
 
     // Workspace State
     const [rawText, setRawText] = useState('');
@@ -100,7 +121,30 @@ const App: React.FC = () => {
     // --- Initialization ---
     useEffect(() => {
         loadLeads();
+        loadSettings();
     }, []);
+
+    const loadSettings = async () => {
+        try {
+            const saved = await dbService.getSettings();
+            if (saved) {
+                setUserSettings(saved);
+                localStorage.setItem('tf_user_settings', JSON.stringify(saved));
+            } else {
+                const local = localStorage.getItem('tf_user_settings');
+                if (local) {
+                    const parsed = JSON.parse(local);
+                    setUserSettings(parsed);
+                    await dbService.saveSettings(parsed);
+                } else {
+                    setIsSetupMode(true);
+                    setShowSettingsModal(true);
+                }
+            }
+        } catch (e) {
+            console.error("Failed to load settings", e);
+        }
+    };
 
     const loadLeads = async () => {
         try {
@@ -108,6 +152,22 @@ const App: React.FC = () => {
             setLeads(data);
         } catch (e) {
             console.error("Failed to load leads", e);
+        }
+    };
+
+    // --- Settings Management ---
+    const handleSaveSettings = async (details: PaymentBankDetails) => {
+        const newSettings: UserSettings = { 
+            companyName: details.companyName,
+            paymentDetails: details 
+        };
+        setUserSettings(newSettings);
+        localStorage.setItem('tf_user_settings', JSON.stringify(newSettings));
+        setIsSetupMode(false); // Mode cleared on save
+        try {
+            await dbService.saveSettings(newSettings);
+        } catch (e) {
+            console.error("Failed to sync settings to Supabase", e);
         }
     };
 
@@ -313,7 +373,7 @@ const App: React.FC = () => {
     const handleDownloadDocx = async () => {
         if (!quotationData) return;
         try {
-            const blob = await createDocx(quotationData);
+            const blob = await createDocx(quotationData, userSettings.paymentDetails);
             FileSaver.saveAs(blob, `${quotationData.customerName.replace(/\s+/g, '_')}.docx`);
         } catch (e) {
             console.error(e);
@@ -573,7 +633,16 @@ const App: React.FC = () => {
                     onCreateLead={handleCreateLead}
                     onUpdateLead={handleUpdateLead}
                     onDeleteLead={handleDeleteLead}
+                    onOpenSettings={() => setShowSettingsModal(true)}
                 />
+                {showSettingsModal && (
+                    <PaymentSettings
+                        details={{ ...userSettings.paymentDetails, companyName: userSettings.companyName }}
+                        onSave={handleSaveSettings}
+                        onClose={() => { setShowSettingsModal(false); setIsSetupMode(false); }}
+                        isSetupMode={isSetupMode}
+                    />
+                )}
             </div>
         );
     }
@@ -637,6 +706,7 @@ const App: React.FC = () => {
                             onSyncDrive={checkForDriveRevisions}
                             clientName={currentLead?.name}
                             onSyncName={handleSyncName}
+                            paymentDetails={userSettings.paymentDetails}
                         />
                     </div>
                     <QuotationAIAssistant

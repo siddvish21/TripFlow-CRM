@@ -1,6 +1,6 @@
 
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, ImageRun, Table, TableRow, TableCell, WidthType, BorderStyle, VerticalAlign, ExternalHyperlink, UnderlineType, ShadingType, PageBreak } from 'docx';
-import { QuotationData, ItineraryDay, HotelInfo } from '../types';
+import { QuotationData, ItineraryDay, HotelInfo, PaymentBankDetails } from '../types';
 import { getHotelBannerBase64, getPartnerBannerBase64, getBestRateBadgeBase64, getTripExploreRatedBase64, getTopHeaderImageBase64, getCallButtonBase64, getWhatsappButtonBase64 } from './imageService';
 
 function base64ToArrayBuffer(base64: string): ArrayBuffer {
@@ -62,7 +62,7 @@ const calculateFinancials = (data: QuotationData) => {
 }
 
 
-export const createDocx = async (data: QuotationData): Promise<Blob> => {
+export const createDocx = async (data: QuotationData, paymentDetails: PaymentBankDetails): Promise<Blob> => {
     const [headerImageB64, partnerImageB64, rateBadgeB64, ratedLogoB64, topHeaderImageB64, callButtonB64, whatsappButtonB64] = await Promise.all([
         getHotelBannerBase64(),
         getPartnerBannerBase64(),
@@ -202,7 +202,7 @@ export const createDocx = async (data: QuotationData): Promise<Blob> => {
                         new TextRun({ text: "🤝 In ", font: "Lexend", bold: true, italics: true, size: 26, color: "333333" }),
                         new TextRun({ text: "collaboration", font: "Lexend", bold: true, italics: true, underline: { type: UnderlineType.SINGLE }, shading: { type: ShadingType.CLEAR, fill: "FFFF00" }, size: 26, color: "000000" }),
                         new TextRun({ text: " with our trusted partners at ", font: "Lexend", bold: true, italics: true, size: 26, color: "333333" }),
-                        new TextRun({ text: "TripExplore", font: "Lexend", bold: true, italics: true, underline: { type: UnderlineType.SINGLE }, shading: { type: ShadingType.CLEAR, fill: "FFFF00" }, size: 26, color: "000000" }),
+                        new TextRun({ text: paymentDetails.companyName, font: "Lexend", bold: true, italics: true, underline: { type: UnderlineType.SINGLE }, shading: { type: ShadingType.CLEAR, fill: "FFFF00" }, size: 26, color: "000000" }),
                         new TextRun({ text: " – crafting seamless travel experiences together.", font: "Lexend", bold: true, italics: true, size: 26, color: "333333" }),
                     ]
                 }),
@@ -569,11 +569,11 @@ export const createDocx = async (data: QuotationData): Promise<Blob> => {
                                     borders: tableCellBorders,
                                     margins: { top: 200, bottom: 200, left: 200, right: 200 },
                                     children: [
-                                        new Paragraph({ children: [new TextRun({ text: "Account Name: ", bold: true }), new TextRun("tripexplore.in")] }),
-                                        new Paragraph({ children: [new TextRun({ text: "Account Number: ", bold: true }), new TextRun({ text: "2612421112", font: "Courier New" })] }),
-                                        new Paragraph({ children: [new TextRun({ text: "Bank Name: ", bold: true }), new TextRun("Kotak Mahindra Bank")] }),
-                                        new Paragraph({ children: [new TextRun({ text: "IFSC Code: ", bold: true }), new TextRun({ text: "KKBK0000463", color: "B91C1C" })] }),
-                                        new Paragraph({ children: [new TextRun({ text: "GPAY Number: ", bold: true }), new TextRun({ text: "9841291289", bold: true, color: "15803D" })] }),
+                                        new Paragraph({ children: [new TextRun({ text: "Account Name: ", bold: true }), new TextRun(paymentDetails.accountHolder)] }),
+                                        new Paragraph({ children: [new TextRun({ text: "Account Number: ", bold: true }), new TextRun({ text: paymentDetails.accountNumber, font: "Courier New" })] }),
+                                        new Paragraph({ children: [new TextRun({ text: "Bank Name: ", bold: true }), new TextRun(paymentDetails.bankName)] }),
+                                        new Paragraph({ children: [new TextRun({ text: "IFSC Code: ", bold: true }), new TextRun({ text: paymentDetails.ifscCode, color: "B91C1C" })] }),
+                                        new Paragraph({ children: [new TextRun({ text: "GPAY Number: ", bold: true }), new TextRun({ text: paymentDetails.gpayNumber, bold: true, color: "15803D" })] }),
                                     ]
                                 })
                             ]
@@ -584,7 +584,7 @@ export const createDocx = async (data: QuotationData): Promise<Blob> => {
                 // Contact
                 new Paragraph({ text: "📞 For further details or confirmation, feel free to contact us anytime.", style: "normal", spacing: { before: 600 } }),
                 new Paragraph({ text: "Best Regards,", style: "normal" }),
-                new Paragraph({ children: [new TextRun({ text: "Vishwanathan ", bold: true, size: 36, color: "1E3A8A" })], spacing: { after: 200 } }),
+                new Paragraph({ children: [new TextRun({ text: paymentDetails.accountHolder, bold: true, size: 36, color: "1E3A8A" })], spacing: { after: 200 } }),
 
                 // CTA Buttons
                 new Paragraph({
@@ -595,7 +595,7 @@ export const createDocx = async (data: QuotationData): Promise<Blob> => {
                                 children: [
                                     new ImageRun({ data: callButtonBuffer, transformation: { width: 150, height: 50 } }),
                                 ],
-                                link: "tel:+919841291289"
+                                link: `tel:${paymentDetails.gpayNumber.replace(/\s+/g, '')}`
                             })
                         ] : []),
                         new TextRun("   "), // Spacer
@@ -604,7 +604,7 @@ export const createDocx = async (data: QuotationData): Promise<Blob> => {
                                 children: [
                                     new ImageRun({ data: whatsappButtonBuffer, transformation: { width: 150, height: 50 } }),
                                 ],
-                                link: "https://wa.me/919841291289"
+                                link: `https://wa.me/${paymentDetails.gpayNumber.replace(/[^0-9]/g, '')}`
                             })
                         ] : [])
                     ],

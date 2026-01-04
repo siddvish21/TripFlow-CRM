@@ -245,5 +245,32 @@ export const dbService = {
             console.error("Supabase Error (deleteTemplate):", error);
             throw new Error(`Failed to delete template: ${error.message}`);
         }
+    },
+
+    // --- SETTINGS ---
+    async getSettings(): Promise<any | null> {
+        const { data, error } = await supabase
+            .from('settings')
+            .select('*')
+            .eq('id', 1)
+            .maybeSingle();
+
+        if (error) {
+            console.error("Supabase Error (getSettings):", error);
+            return null;
+        }
+
+        return data?.value || null;
+    },
+
+    async saveSettings(settings: any): Promise<void> {
+        const { error } = await supabase
+            .from('settings')
+            .upsert({ id: 1, value: settings, updated_at: new Date().toISOString() });
+
+        if (error) {
+            console.error("Supabase Error (saveSettings):", error);
+            throw new Error("Failed to save settings to Supabase");
+        }
     }
 };

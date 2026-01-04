@@ -9,9 +9,10 @@ interface DashboardProps {
     onCreateLead: (lead: Lead) => void;
     onUpdateLead: (lead: Lead) => void;
     onDeleteLead: (leadId: number) => void;
+    onOpenSettings: () => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ leads, onOpenLead, onCreateLead, onUpdateLead, onDeleteLead }) => {
+const Dashboard: React.FC<DashboardProps> = ({ leads, onOpenLead, onCreateLead, onUpdateLead, onDeleteLead, onOpenSettings }) => {
     const [showModal, setShowModal] = useState(false);
     const [analysisResult, setAnalysisResult] = useState<{ id: number, score: string, action: string } | null>(null);
     const [analyzingId, setAnalyzingId] = useState<number | null>(null);
@@ -81,15 +82,28 @@ const Dashboard: React.FC<DashboardProps> = ({ leads, onOpenLead, onCreateLead, 
                     </h2>
                     <p className="text-gray-400 font-medium">Manage your travel inquiries and AI-powered quotations.</p>
                 </div>
-                <button
-                    onClick={handleOpenCreateModal}
-                    className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3.5 px-8 rounded-2xl shadow-xl shadow-blue-900/30 flex items-center transition-all hover:scale-105 active:scale-95"
-                >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
-                    Create New Inquiry
-                </button>
+                <div className="flex gap-3">
+                    <button
+                        onClick={onOpenSettings}
+                        className="bg-slate-800 hover:bg-slate-700 text-gray-300 font-bold py-3.5 px-6 rounded-2xl border border-white/5 flex items-center transition-all hover:scale-105 active:scale-95 shadow-lg"
+                        title="Global Settings"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        Agency Profile
+                    </button>
+                    <button
+                        onClick={handleOpenCreateModal}
+                        className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3.5 px-8 rounded-2xl shadow-xl shadow-blue-900/30 flex items-center transition-all hover:scale-105 active:scale-95"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                        Create New Inquiry
+                    </button>
+                </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">

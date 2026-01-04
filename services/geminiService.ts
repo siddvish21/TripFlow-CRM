@@ -665,7 +665,7 @@ export const generateSmartQuoteSummary = async (data: QuotationData): Promise<st
 
     try {
         const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: "gemini-2.0-flash",
             contents: prompt,
         });
         return response.text?.trim() || '';
@@ -674,3 +674,49 @@ export const generateSmartQuoteSummary = async (data: QuotationData): Promise<st
         throw new Error("Failed to generate smart summary");
     }
 };
+
+export const parsePaymentImage = async (imageFile: File): Promise<any> => {
+    try {
+        const imagePart = await fileToPart(imageFile);
+        const prompt = `
+        Analyze this image and extract Bank Payment Details.
+        Look for:
+        - Account Holder Name
+        - Account Number
+        - Bank Name
+        - IFSC Code
+        - Account Type (Current/Savings)
+        - GPAY / UPI Number
+        
+        Output strict JSON:
+        {
+          "accountHolder": "...",
+          "accountNumber": "...",
+          "bankName": "...",
+          "ifscCode": "...",
+          "accountType": "...",
+          "gpayNumber": "..."
+        }
+        `;
+
+        const response = await ai.models.generateContent({
+            model: "gemini-2.0-flash",
+            contents: {
+                role: 'user',
+                parts: [
+                    imagePart,
+                    { text: prompt }
+                ]
+            },
+            config: {
+                responseMimeType: "application/json",
+            },
+        });
+
+        return JSON.parse(response.text?.trim() || '{}');
+    } catch (error: any) {
+        console.error("Error parsing payment image:", error);
+        throw new Error("Failed to process payment image.");
+    }
+};
+

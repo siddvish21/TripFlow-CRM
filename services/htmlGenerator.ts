@@ -1,7 +1,7 @@
 
-import { QuotationData } from '../types';
+import { QuotationData, PaymentBankDetails } from '../types';
 
-export const generateQuotationHtml = (data: QuotationData): string => {
+export const generateQuotationHtml = (data: QuotationData, paymentDetails: PaymentBankDetails): string => {
     const {
         customerName,
         destination,
@@ -240,7 +240,7 @@ export const generateQuotationHtml = (data: QuotationData): string => {
             <!-- Collaboration Message -->
             <div class="text-center" style="margin: 15px 0;">
                 <p style="font-size: 14px; color: #555; margin: 0;">
-                    <i>🤝 In <u>collaboration</u> with our trusted partners at <span style="background-color: #fef08a; padding: 0 4px; color: black; font-weight: 600;">TripExplore</span> – crafting seamless travel experiences.</i>
+                    <i>🤝 In <u>collaboration</u> with our trusted partners at <span style="background-color: #fef08a; padding: 0 4px; color: black; font-weight: 600;">${paymentDetails.companyName}</span> – crafting seamless travel experiences.</i>
                 </p>
             </div>
 
@@ -471,24 +471,24 @@ export const generateQuotationHtml = (data: QuotationData): string => {
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
                     <div>
                         <p style="margin: 0; font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 700;">Account Name</p>
-                        <p style="margin: 5px 0 0 0; font-weight: bold; font-size: 16px;">tripexplore.in</p>
+                        <p style="margin: 5px 0 0 0; font-weight: bold; font-size: 16px;">${paymentDetails.accountHolder}</p>
                     </div>
                     <div>
                          <p style="margin: 0; font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 700;">Account Number</p>
-                        <p style="margin: 5px 0 0 0; font-weight: bold; font-size: 18px; font-family: monospace;">2612421112</p>
+                        <p style="margin: 5px 0 0 0; font-weight: bold; font-size: 18px; font-family: monospace;">${paymentDetails.accountNumber}</p>
                     </div>
                     <div>
                          <p style="margin: 0; font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 700;">Bank Name</p>
-                        <p style="margin: 5px 0 0 0; font-weight: bold; font-size: 16px;">Kotak Mahindra Bank</p>
+                        <p style="margin: 5px 0 0 0; font-weight: bold; font-size: 16px;">${paymentDetails.bankName}</p>
                     </div>
                     <div>
                          <p style="margin: 0; font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 700;">IFSC Code</p>
-                        <p style="margin: 5px 0 0 0; font-weight: bold; font-size: 16px; font-family: monospace;">KKBK0000463</p>
+                        <p style="margin: 5px 0 0 0; font-weight: bold; font-size: 16px; font-family: monospace;">${paymentDetails.ifscCode}</p>
                     </div>
                 </div>
                 <div style="border-top: 1px dashed #cbd5e1; margin-top: 20px; padding-top: 20px; text-align: center;">
                     <p style="margin: 0; font-weight: bold; font-size: 14px; color: #475569;">GPay / PhonePe</p>
-                    <p style="margin: 5px 0 0 0; font-size: 24px; font-weight: 900; color: #15803d;">9841291289</p>
+                    <p style="margin: 5px 0 0 0; font-size: 24px; font-weight: 900; color: #15803d;">${paymentDetails.gpayNumber}</p>
                 </div>
             </div>
 
@@ -497,15 +497,15 @@ export const generateQuotationHtml = (data: QuotationData): string => {
                 <p style="margin-bottom: 20px; color: #6b7280; font-style: italic;">📞 For details or booking confirmation, please contact us.</p>
                 <div style="display: flex; justify-content: center; gap: 20px; margin-top: 20px;">
                 <div style="display: flex; justify-content: center; gap: 20px; margin-top: 20px;">
-                    <a href="tel:+918884016046" style="text-decoration: none;">
+                    <a href="tel:${paymentDetails.gpayNumber.replace(/\s+/g, '')}" style="text-decoration: none;">
                         <img src="https://res.cloudinary.com/dnauowwb0/image/upload/v1767504923/Call-Now-Button_gq6urr.png" alt="Call Now" style="height: 50px;" />
                     </a>
-                    <a href="https://wa.me/918884016046" style="text-decoration: none;">
+                    <a href="https://wa.me/${paymentDetails.gpayNumber.replace(/[^0-9]/g, '')}" style="text-decoration: none;">
                         <img src="https://res.cloudinary.com/dnauowwb0/image/upload/v1767504923/Whatsapp-Button_kuwlcf.png" alt="WhatsApp" style="height: 50px;" />
                     </a>
                 </div>
                 </div>
-                <p style="margin-top: 30px; font-weight: bold; color: #1e3a8a; font-size: 20px;">Vishwanathan</p>
+                <p style="margin-top: 30px; font-weight: bold; color: #1e3a8a; font-size: 20px;">${paymentDetails.accountHolder}</p>
             </div>
 
             <img src="${HEADER_IMG_URL}" class="trip-explore-banner" style="margin-top: 40px;" alt="Footer Banner" />
