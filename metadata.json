@@ -1,0 +1,5 @@
+{
+  "name": "AI Travel Quotation Generator",
+  "description": "An application that uses AI to convert unorganized raw text data into a structured and beautifully formatted travel quotation document (.docx), complete with a detailed itinerary.",
+  "requestFramePermissions": []
+}
