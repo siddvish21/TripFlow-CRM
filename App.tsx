@@ -24,7 +24,7 @@ import QuotationAIAssistant from './components/QuotationAIAssistant';
 import QuoteSummary from './components/QuoteSummary';
 import { generateQuotationFromText, parseExistingQuotationText, parseFinancialImage } from './services/geminiService';
 import { createDocx } from './services/docxGenerator';
-import { generateFinancialExcel } from './services/excelGenerator';
+import { generateFinancialExcel, generateQuotationExcelFromTemplate } from './services/excelGenerator';
 import { dbService } from './services/dbService';
 import { extractTextFromDocx } from './services/importService';
 import { listFiles, findFolder, ensureFolderStructure } from './services/googleDriveService';
@@ -402,8 +402,15 @@ const App: React.FC = () => {
 
     const handleDownloadExcel = async () => {
         if (currentLead) {
-            const blob = await generateFinancialExcel(financialState, currentLead);
-            FileSaver.saveAs(blob, `Financials_${currentLead.name.replace(/\s+/g, '_')}.xlsx`);
+            try {
+                const blob = await generateQuotationExcelFromTemplate(financialState, currentLead.name);
+                FileSaver.saveAs(blob, `Financials_${currentLead.name.replace(/\s+/g, '_')}.xlsx`);
+            } catch (e) {
+                console.error("Excel generation failed", e);
+                alert("Failed to generate template-based Excel. Falling back to simple format.");
+                const blob = await generateFinancialExcel(financialState, currentLead);
+                FileSaver.saveAs(blob, `Financials_${currentLead.name.replace(/\s+/g, '_')}_Simple.xlsx`);
+            }
         }
     };
 
