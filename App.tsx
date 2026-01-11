@@ -467,7 +467,7 @@ const App: React.FC = () => {
                 FileSaver.saveAs(blob, `Financials_${currentLead.name.replace(/\s+/g, '_')}.xlsx`);
             } catch (e) {
                 console.error("Excel generation failed", e);
-                alert("Failed to generate template-based Excel. Falling back to simple format.");
+                alert(`Failed to generate template-based Excel: ${e instanceof Error ? e.message : 'Unknown error'}. Falling back to simple format.`);
                 const blob = await generateFinancialExcel(financialState, currentLead);
                 FileSaver.saveAs(blob, `Financials_${currentLead.name.replace(/\s+/g, '_')}_Simple.xlsx`);
             }

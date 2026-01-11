@@ -109,37 +109,55 @@ export const generateFinancialExcel = async (state: CalculatorState, lead: Lead)
 
 export const generateQuotationExcelFromTemplate = async (state: CalculatorState, customerName: string): Promise<Blob> => {
     // 1. Fetch Template
-    const response = await fetch('/assets/Quotation Sheet.XLSX');
+    // Using a cache buster and direct path
+    const templatePath = '/assets/quotation_template.xlsx';
+    console.log("Fetching Excel template from:", templatePath);
+    const response = await fetch(`${templatePath}?t=${Date.now()}`);
+    
+    if (!response.ok) {
+        throw new Error(`Failed to fetch Excel template from ${templatePath}: ${response.status} ${response.statusText}`);
+    }
+
     const arrayBuffer = await response.arrayBuffer();
 
     const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(arrayBuffer);
+    try {
+        await workbook.xlsx.load(arrayBuffer);
+    } catch (loadError) {
+        console.error("ExcelJS load error:", loadError);
+        throw new Error("Failed to load Excel template. The file may be corrupt or in an unsupported format.");
+    }
 
     const ws = workbook.getWorksheet('5%');
-    if (!ws) throw new Error("Template sheet '5%' not found");
+    if (!ws) {
+        const sheetNames = workbook.worksheets.map(w => w.name).join(', ');
+        console.error(`Available sheets: ${sheetNames}`);
+        throw new Error(`Template sheet '5%' not found in the Excel file. Available sheets: ${sheetNames}`);
+    }
 
     // 2. Fill Block 1 (Option 1)
-    ws.getCell('E19').value = state.configs.block1.gstPct / 100;
-    ws.getCell('E22').value = state.configs.block1.tcsPct / 100;
-    ws.getCell('C17').value = state.configs.block1.markupPct;
-    ws.getCell('D4').value = `no of pax/total (${state.configs.block1.pax})`;
+    try {
+        ws.getCell('E19').value = (state.configs.block1.gstPct || 0) / 100;
+        ws.getCell('E22').value = (state.configs.block1.tcsPct || 0) / 100;
+        ws.getCell('C17').value = state.configs.block1.markupPct || 0;
+        ws.getCell('D4').value = `no of pax/total (${state.configs.block1.pax || 2})`;
 
-    // 3. Fill Block 2 (Option 2)
-    ws.getCell('N19').value = state.configs.block2.gstPct / 100;
-    ws.getCell('N22').value = state.configs.block2.tcsPct / 100;
-    ws.getCell('L17').value = state.configs.block2.markupPct;
-    ws.getCell('M4').value = `no of pax/total (${state.configs.block2.pax})`;
+        // 3. Fill Block 2 (Option 2)
+        ws.getCell('N19').value = (state.configs.block2.gstPct || 0) / 100;
+        ws.getCell('N22').value = (state.configs.block2.tcsPct || 0) / 100;
+        ws.getCell('L17').value = state.configs.block2.markupPct || 0;
+        ws.getCell('M4').value = `no of pax/total (${state.configs.block2.pax || 2})`;
 
-    // 4. Fill Block 3 (Option 3)
-    ws.getCell('W19').value = state.configs.block3.gstPct / 100;
-    ws.getCell('W22').value = state.configs.block3.tcsPct / 100;
-    ws.getCell('U17').value = state.configs.block3.markupPct;
-    ws.getCell('V4').value = `no of pax/total (${state.configs.block3.pax})`;
+        // 4. Fill Block 3 (Option 3)
+        ws.getCell('W19').value = (state.configs.block3.gstPct || 0) / 100;
+        ws.getCell('W22').value = (state.configs.block3.tcsPct || 0) / 100;
+        ws.getCell('U17').value = state.configs.block3.markupPct || 0;
+        ws.getCell('V4').value = `no of pax/total (${state.configs.block3.pax || 2})`;
 
-    // 5. Fill Items
-    state.rows.forEach((row, index) => {
-        const r = 5 + index;
-        if (r > 15) return; // Template limit
+        // 5. Fill Items
+        state.rows.forEach((row, index) => {
+            const r = 5 + index;
+            if (r > 15) return; // Template limit
 
         // Block 1
         ws.getCell(`A${r}`).value = row.label;
@@ -196,6 +214,11 @@ export const generateQuotationExcelFromTemplate = async (state: CalculatorState,
         ws.getCell(`V${r}`).value = v.markupPerPax3;
         ws.getCell(`X${r}`).value = v.qty3;
     });
+
+    } catch (err: any) {
+        console.error("Error filling Excel template:", err);
+        throw new Error(`Failed to fill Excel template: ${err.message}`);
+    }
 
     // 7. Name List Sheet
     const nameSheet = workbook.getWorksheet('Name List');
