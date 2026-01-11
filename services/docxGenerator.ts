@@ -81,7 +81,7 @@ export const createDocx = async (data: QuotationData, paymentDetails: PaymentBan
     const callButtonBuffer = base64ToArrayBuffer(callButtonB64);
     const whatsappButtonBuffer = base64ToArrayBuffer(whatsappButtonB64);
 
-    const { hotelCategory, totalAmount, amountReceived, balanceAmount, showAccommodations } = data;
+    const { hotelCategory, totalAmount, amountReceived, balanceAmount, showAccommodations, adultsCount, childrenCount, childAges } = data;
     const financials = calculateFinancials(data);
 
     const tableCellBorders = {
@@ -147,27 +147,27 @@ export const createDocx = async (data: QuotationData, paymentDetails: PaymentBan
             paragraphStyles: [
                 {
                     id: "normal", name: "Normal", basedOn: "Normal", next: "Normal",
-                    run: { font: "Lexend", size: 28 }, // 14pt
+                    run: { font: "Lexend", size: 32 }, // Increased from 28 to 32
                     paragraph: { spacing: { after: 120 } },
                 },
                 {
                     id: "ProblemHeader", name: "Problem Header", basedOn: "Normal", next: "Normal",
-                    run: { font: "Lexend", size: 64, bold: true, color: "00AEEF" }, // Approx 32pt
+                    run: { font: "Lexend", size: 68, bold: true, color: "00AEEF" }, // Increased from 64 to 68
                     paragraph: { spacing: { before: 200, after: 100 } }
                 },
                 {
                     id: "RealityHeader", name: "Reality Header", basedOn: "Normal", next: "Normal",
-                    run: { font: "Lexend", size: 36, bold: true, color: "000000" },
+                    run: { font: "Lexend", size: 40, bold: true, color: "000000" }, // Increased from 36 to 40
                     paragraph: { spacing: { before: 100, after: 100 } }
                 },
                 {
                     id: "TransparencyText", name: "Transparency Text", basedOn: "Normal", next: "Normal",
-                    run: { font: "Lexend", size: 32, color: "333333" }, // 16pt
+                    run: { font: "Lexend", size: 36, color: "333333" }, // Increased from 32 to 36
                     paragraph: { spacing: { after: 150 } }
                 },
                 {
                     id: "dayBox", name: "Day Box", basedOn: "Normal", next: "Normal",
-                    run: { font: "Lexend", size: 32, bold: true, color: "003366" },
+                    run: { font: "Lexend", size: 36, bold: true, color: "003366" }, // Increased from 32 to 36
                     paragraph: {
                         spacing: { before: 400, after: 150 },
                         indent: { left: 200 }
@@ -175,7 +175,7 @@ export const createDocx = async (data: QuotationData, paymentDetails: PaymentBan
                 },
                 {
                     id: "itineraryPoint", name: "Itinerary Point", basedOn: "Normal", next: "Normal",
-                    run: { font: "Lexend", size: 26 }, // 13pt
+                    run: { font: "Lexend", size: 30 }, // Increased from 26 to 30
                     paragraph: {
                         indent: { left: 800, hanging: 300 },
                         spacing: { after: 120 }
@@ -197,13 +197,23 @@ export const createDocx = async (data: QuotationData, paymentDetails: PaymentBan
                 // 2. Collaboration Message
                 new Paragraph({
                     alignment: AlignmentType.CENTER,
-                    spacing: { after: 100 },
+                    spacing: { after: 200 },
                     children: [
-                        new TextRun({ text: "🤝 In ", font: "Lexend", bold: true, italics: true, size: 26, color: "333333" }),
-                        new TextRun({ text: "collaboration", font: "Lexend", bold: true, italics: true, underline: { type: UnderlineType.SINGLE }, shading: { type: ShadingType.CLEAR, fill: "FFFF00" }, size: 26, color: "000000" }),
-                        new TextRun({ text: " with our trusted partners at ", font: "Lexend", bold: true, italics: true, size: 26, color: "333333" }),
-                        new TextRun({ text: paymentDetails.companyName, font: "Lexend", bold: true, italics: true, underline: { type: UnderlineType.SINGLE }, shading: { type: ShadingType.CLEAR, fill: "FFFF00" }, size: 26, color: "000000" }),
-                        new TextRun({ text: " – crafting seamless travel experiences together.", font: "Lexend", bold: true, italics: true, size: 26, color: "333333" }),
+                        new TextRun({ text: "🤝 In ", font: "Lexend", bold: true, italics: true, size: 30, color: "333333" }),
+                        new TextRun({ text: "collaboration", font: "Lexend", bold: true, italics: true, underline: { type: UnderlineType.SINGLE }, shading: { type: ShadingType.CLEAR, fill: "FFFF00" }, size: 30, color: "000000" }),
+                        new TextRun({ text: " with our trusted partners at TripExplore – crafting seamless travel experiences together.", font: "Lexend", bold: true, italics: true, size: 30, color: "333333" }),
+                    ]
+                }),
+                new Paragraph({
+                    alignment: AlignmentType.CENTER,
+                    spacing: { after: 200 },
+                    children: [
+                        new ExternalHyperlink({
+                            children: [
+                                new TextRun({ text: "🔗 Know more about them at: www.tripexplore.in", font: "Lexend", size: 28, color: "0000FF", underline: { type: UnderlineType.SINGLE } })
+                            ],
+                            link: "https://www.tripexplore.in"
+                        })
                     ]
                 }),
 
@@ -244,7 +254,7 @@ export const createDocx = async (data: QuotationData, paymentDetails: PaymentBan
                     spacing: { after: 100 }
                 }),
                 new Paragraph({
-                    children: [new TextRun({ text: "• One hotel may cost Rs 5,000 a night, another Rs 2,500, even in the same area.", font: "Lexend", size: 32 })],
+                    children: [new TextRun({ text: "• One hotel may cost Rs 5,000 a night, another Rs 2,500, even in the same area.", font: "Lexend", size: 36 })],
                     indent: { left: 400 },
                     spacing: { after: 200 }
                 }),
@@ -298,6 +308,11 @@ export const createDocx = async (data: QuotationData, paymentDetails: PaymentBan
                                     shading: { fill: "F9FAFB" },
                                     borders: tableCellBorders,
                                     children: [
+                                        new Paragraph({ children: [
+                                            new TextRun({ text: "👥 PAX: ", bold: true }), 
+                                            new TextRun(`${adultsCount || 0} Adults + ${childrenCount || 0} Child`),
+                                            ...(childAges ? [new TextRun({ text: ` (Age: ${childAges})`, size: 24, color: "666666" })] : [])
+                                        ] }),
                                         new Paragraph({ children: [new TextRun({ text: "📍 Destination: ", bold: true }), new TextRun(data.destination)] }),
                                         new Paragraph({ children: [new TextRun({ text: "⏳ Duration: ", bold: true }), new TextRun(data.duration)] }),
                                         new Paragraph({ children: [new TextRun({ text: "🗓️ Dates: ", bold: true }), new TextRun(data.dates)] }),
@@ -382,6 +397,92 @@ export const createDocx = async (data: QuotationData, paymentDetails: PaymentBan
                     ),
                 ] : []),
 
+                // Package Cost Summary Section (Before Inclusions)
+                ...(financials && financials.length > 0 ? [
+                    new Paragraph({ text: "💰 Package Cost Summary", heading: HeadingLevel.HEADING_2, spacing: { before: 800, after: 400 } }),
+                    ...financials.map((opt: any, i: number) => {
+                        const costPerHead = opt.netCostPerPerson + opt.addOnCost;
+                        const totalCostForPax = costPerHead * data.paxCount;
+                        
+                        return new Table({
+                            width: { size: 9500, type: WidthType.DXA },
+                            columnWidths: [4750, 4750],
+                            rows: [
+                                // Option Label Header
+                                new TableRow({
+                                    children: [
+                                        new TableCell({
+                                            columnSpan: 2,
+                                            shading: { fill: "DBEAFE" },
+                                            children: [new Paragraph({ 
+                                                children: [new TextRun({ text: opt.label || `Option ${i + 1}`, bold: true, size: 28 })], 
+                                                alignment: AlignmentType.CENTER 
+                                            })],
+                                            borders: tableCellBorders
+                                        })
+                                    ]
+                                }),
+                                // Cost Per Head
+                                new TableRow({
+                                    children: [
+                                        new TableCell({
+                                            children: [new Paragraph({ 
+                                                children: [new TextRun({ text: "Cost Per Head", size: 22 })] 
+                                            })],
+                                            borders: tableCellBorders,
+                                            shading: { fill: "FFFFFF" }
+                                        }),
+                                        new TableCell({
+                                            children: [new Paragraph({ 
+                                                children: [new TextRun({ text: `INR ${costPerHead.toLocaleString('en-IN')}`, bold: true, size: 24, color: "1E40AF" })],
+                                                alignment: AlignmentType.CENTER
+                                            })],
+                                            borders: tableCellBorders,
+                                            shading: { fill: "FFFFFF" }
+                                        })
+                                    ]
+                                }),
+                                // Total Cost for n Pax
+                                new TableRow({
+                                    children: [
+                                        new TableCell({
+                                            children: [new Paragraph({ 
+                                                children: [new TextRun({ text: `Total Cost for ${data.paxCount} Pax`, size: 22 })] 
+                                            })],
+                                            borders: tableCellBorders,
+                                            shading: { fill: "FFFFFF" }
+                                        }),
+                                        new TableCell({
+                                            children: [new Paragraph({ 
+                                                children: [new TextRun({ text: `INR ${totalCostForPax.toLocaleString('en-IN')}`, bold: true, size: 24, color: "15803D" })],
+                                                alignment: AlignmentType.CENTER
+                                            })],
+                                            borders: tableCellBorders,
+                                            shading: { fill: "FFFFFF" }
+                                        })
+                                    ]
+                                }),
+                                // GST Note
+                                new TableRow({
+                                    children: [
+                                        new TableCell({
+                                            columnSpan: 2,
+                                            children: [new Paragraph({ 
+                                                children: [new TextRun({ text: "GST additional at 5% and is subject to RBI regulations.", size: 20, italics: true, color: "374151" })],
+                                                alignment: AlignmentType.CENTER,
+                                                spacing: { before: 200, after: 200 }
+                                            })],
+                                            borders: tableCellBorders,
+                                            shading: { fill: "F9FAFB" }
+                                        })
+                                    ]
+                                })
+                            ]
+                        });
+                    }),
+                    new Paragraph({ text: "", spacing: { after: 400 } })
+                ] : []),
+
                 // Inclusions structured with headings and subheadings
                 new Paragraph({ text: "✅ Inclusions", heading: HeadingLevel.HEADING_2, spacing: { before: 800, after: 200 } }),
                 ...(() => {
@@ -424,17 +525,13 @@ export const createDocx = async (data: QuotationData, paymentDetails: PaymentBan
 
                 ...financials.map((f, index) => {
                     const child = f.childCosts && f.childCosts.length > 0 ? f.childCosts[0] : null;
-                    const adultCount = data.paxCount; // Assuming paxCount is adults
-                    // If we have explicit child counts in the future, we used them. For now, assuming 1 child for the column if child exists, 
-                    // but for Grand Total we might need to know how many children. 
-                    // Since 'childCosts' in the calculator might just be definitions, we will calculate 'Net Payable' as Per Head * Count if we knew it.
-                    // For now, Net Payable in the column will be (Net Cost + Flight) * Count.
+                    const adultCount = data.adultsCount || data.paxCount;
+                    const childCount = data.childrenCount || 0;
+                    const adultSubtotal = (f.netCostPerPerson + f.addOnCost) * adultCount;
+                    const childSubtotal = child ? (child.netCost + f.addOnCost) * childCount : 0;
 
                     // Note: 'f.netPayable' from calculation includes everything? 
                     // In 'calculateFinancials', netPayable = (netCostPerPerson + addOnCost) * data.paxCount.
-
-                    const adultSubtotal = (f.netCostPerPerson + f.addOnCost) * adultCount;
-                    const childSubtotal = child ? (child.netCost + f.addOnCost) * 1 : 0; // Assuming 1 child for display if count unknown
 
                     // We'll trust the 'netPayable' passed in f for the adult part (or total group?), 
                     // actually f.netPayable in calculateFinancials equals adult part.
@@ -497,7 +594,7 @@ export const createDocx = async (data: QuotationData, paymentDetails: PaymentBan
                             // 8. Net Payable Amount (Category Subtotal)
                             createRateRow("Net Payable Amount (Category Total)", [
                                 `INR ${adultSubtotal.toLocaleString('en-IN')} (x${adultCount})`,
-                                child ? `INR ${childSubtotal.toLocaleString('en-IN')} (x1)` : "-"
+                                child ? `INR ${childSubtotal.toLocaleString('en-IN')} (x${childCount})` : "-"
                             ]),
 
                             // 9. Grand Total (Merged)
@@ -511,7 +608,7 @@ export const createDocx = async (data: QuotationData, paymentDetails: PaymentBan
                                     }),
                                     new TableCell({
                                         children: [new Paragraph({
-                                            children: [new TextRun({ text: `INR ${(adultSubtotal + childSubtotal).toLocaleString('en-IN')}/-`, bold: true, color: "FF0000", size: 32 })],
+                                            children: [new TextRun({ text: `INR ${(adultSubtotal + childSubtotal).toLocaleString('en-IN')}/-`, bold: true, color: "FF0000", size: 36 })],
                                             alignment: AlignmentType.CENTER
                                         })],
                                         borders: tableCellBorders,
@@ -536,9 +633,9 @@ export const createDocx = async (data: QuotationData, paymentDetails: PaymentBan
                                     borders: tableCellBorders,
                                     margins: { top: 300, bottom: 300, left: 300, right: 300 },
                                     children: [
-                                        new Paragraph({ children: [new TextRun({ text: "💰 Total Group Payable: ", color: "FFFFFF" }), new TextRun({ text: `₹${totalAmount.toLocaleString('en-IN')}/-`, bold: true, color: "10B981", size: 36 })] }),
-                                        new Paragraph({ children: [new TextRun({ text: "✅ Advance Received: ", color: "60A5FA" }), new TextRun({ text: `₹${amountReceived.toLocaleString('en-IN')}/-`, color: "FFFFFF" })] }),
-                                        new Paragraph({ children: [new TextRun({ text: "💳 Balance Due: ", color: "F87171", bold: true }), new TextRun({ text: `₹${balanceAmount.toLocaleString('en-IN')}/-`, bold: true, color: "FFFFFF", size: 32 })] }),
+                                        new Paragraph({ children: [new TextRun({ text: "💰 Total Group Payable: ", color: "FFFFFF", size: 36 }), new TextRun({ text: `₹${totalAmount.toLocaleString('en-IN')}/-`, bold: true, color: "10B981", size: 40 })] }),
+                                        new Paragraph({ children: [new TextRun({ text: "✅ Advance Received: ", color: "60A5FA", size: 32 }), new TextRun({ text: `₹${amountReceived.toLocaleString('en-IN')}/-`, color: "FFFFFF", size: 32 })] }),
+                                        new Paragraph({ children: [new TextRun({ text: "💳 Balance Due: ", color: "F87171", bold: true, size: 32 }), new TextRun({ text: `₹${balanceAmount.toLocaleString('en-IN')}/-`, bold: true, color: "FFFFFF", size: 36 })] }),
                                     ]
                                 })
                             ]
@@ -584,7 +681,7 @@ export const createDocx = async (data: QuotationData, paymentDetails: PaymentBan
                 // Contact
                 new Paragraph({ text: "📞 For further details or confirmation, feel free to contact us anytime.", style: "normal", spacing: { before: 600 } }),
                 new Paragraph({ text: "Best Regards,", style: "normal" }),
-                new Paragraph({ children: [new TextRun({ text: paymentDetails.accountHolder, bold: true, size: 36, color: "1E3A8A" })], spacing: { after: 200 } }),
+                new Paragraph({ children: [new TextRun({ text: "Vishwanathan | +91-8884016046 |", bold: true, size: 36, color: "1E3A8A" })], spacing: { after: 200 } }),
 
                 // CTA Buttons
                 new Paragraph({
@@ -593,18 +690,18 @@ export const createDocx = async (data: QuotationData, paymentDetails: PaymentBan
                         ...(callButtonBuffer.byteLength > 0 ? [
                             new ExternalHyperlink({
                                 children: [
-                                    new ImageRun({ data: callButtonBuffer, transformation: { width: 150, height: 50 } }),
+                                    new ImageRun({ data: callButtonBuffer, transformation: { width: 210, height: 70 } }), // 2.19in x 0.73in @ 96DPI
                                 ],
-                                link: `tel:${paymentDetails.gpayNumber.replace(/\s+/g, '')}`
+                                link: "tel:8884016046"
                             })
                         ] : []),
                         new TextRun("   "), // Spacer
                         ...(whatsappButtonBuffer.byteLength > 0 ? [
                             new ExternalHyperlink({
                                 children: [
-                                    new ImageRun({ data: whatsappButtonBuffer, transformation: { width: 150, height: 50 } }),
+                                    new ImageRun({ data: whatsappButtonBuffer, transformation: { width: 237, height: 79 } }), // 2.47in x 0.82in @ 96DPI
                                 ],
-                                link: `https://wa.me/${paymentDetails.gpayNumber.replace(/[^0-9]/g, '')}`
+                                link: "https://wa.me/8884016046"
                             })
                         ] : [])
                     ],
@@ -625,9 +722,46 @@ export const createDocx = async (data: QuotationData, paymentDetails: PaymentBan
                 ...(headerImageBuffer.byteLength > 0 ? [
                     new Paragraph({
                         children: [new ImageRun({ data: headerImageBuffer, transformation: { width: 620, height: 203 } })],
-                        alignment: AlignmentType.CENTER
+                        alignment: AlignmentType.CENTER,
+                        spacing: { after: 400 }
                     })
                 ] : []),
+
+                // TCS Rules Section
+                new Paragraph({ text: "TCS Rules", heading: HeadingLevel.HEADING_2, spacing: { before: 400, after: 200 } }),
+                new Paragraph({
+                    children: [new TextRun({ text: "Note:", bold: true, size: 28 })],
+                    spacing: { after: 100 }
+                }),
+                new Paragraph({
+                    text: "Effective 01 October 2023, Tax Collected at Source (TCS) shall be applicable as follows for Overseas Tour Packages / Cruises:",
+                    style: "normal"
+                }),
+                new Paragraph({
+                    children: [new TextRun({ text: "• 5% TCS on cumulative payments up to ₹7,00,000", size: 28 })],
+                    indent: { left: 400 }
+                }),
+                new Paragraph({
+                    children: [new TextRun({ text: "• 20% TCS on amounts exceeding ₹7,00,000", size: 28 })],
+                    indent: { left: 400 },
+                    spacing: { after: 200 }
+                }),
+                new Paragraph({
+                    text: "This limit applies to all cumulative payments made against a PAN within the same Financial Year. The buyer is required to furnish an undertaking declaring their total spends on overseas tour packages/cruises during the financial year.",
+                    style: "normal"
+                }),
+                new Paragraph({
+                    text: "The Government of India, Ministry of Finance, via Circular No. 10 of 2023 (F. No. 370142/12/2023-TPL) dated 30 June 2023, has clarified that:",
+                    style: "normal"
+                }),
+                new Paragraph({
+                    children: [new TextRun({ text: "• The undertaking must be furnished by the buyer", size: 28 })],
+                    indent: { left: 400 }
+                }),
+                new Paragraph({
+                    children: [new TextRun({ text: "• Any false declaration will attract appropriate action under the Finance Act, 2023, as per the amended sub-section (1G) of Section 206C of the Income-tax Act, 1961", size: 28 })],
+                    indent: { left: 400 }
+                }),
             ],
         }],
     });

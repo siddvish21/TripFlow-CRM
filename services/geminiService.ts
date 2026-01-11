@@ -9,6 +9,63 @@ if (!API_KEY) {
 
 const ai = new GoogleGenAI({ apiKey: API_KEY });
 
+// Helper to check if an error is a 503/model overloaded error
+const is503Error = (error: any): boolean => {
+    if (!error) return false;
+    
+    // Check various error structures
+    return (
+        error?.status === 503 ||
+        error?.code === 503 ||
+        error?.statusCode === 503 ||
+        error?.error?.code === 503 ||
+        error?.error?.status === 'UNAVAILABLE' ||
+        error?.response?.status === 503 ||
+        error?.response?.statusCode === 503 ||
+        // Check error message strings
+        (typeof error?.message === 'string' && (
+            error.message.includes('503') ||
+            error.message.includes('overloaded') ||
+            error.message.includes('UNAVAILABLE')
+        )) ||
+        // Check nested error message
+        (typeof error?.error?.message === 'string' && (
+            error.error.message.includes('overloaded') ||
+            error.error.message.includes('UNAVAILABLE')
+        ))
+    );
+};
+
+// Retry helper for handling 503 errors and other transient failures
+const retryWithBackoff = async <T>(
+    fn: () => Promise<T>,
+    maxRetries: number = 3,
+    baseDelay: number = 1000
+): Promise<T> => {
+    let lastError: any;
+    
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+            return await fn();
+        } catch (error: any) {
+            lastError = error;
+            
+            // Only retry on 503 errors or if we haven't exceeded max retries
+            if (is503Error(error) && attempt < maxRetries) {
+                const delay = baseDelay * Math.pow(2, attempt); // Exponential backoff: 1s, 2s, 4s
+                console.log(`API returned 503 (model overloaded). Retrying in ${delay}ms... (Attempt ${attempt + 1}/${maxRetries + 1})`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+                continue;
+            }
+            
+            // If it's not a 503 or we've exhausted retries, throw the error
+            throw error;
+        }
+    }
+    
+    throw lastError;
+};
+
 const responseSchema = {
     type: Type.OBJECT,
     properties: {
@@ -16,7 +73,10 @@ const responseSchema = {
         destination: { type: Type.STRING, description: "The primary travel destination." },
         duration: { type: Type.STRING, description: "The total duration of the trip, e.g., '5 Nights / 6 Days'." },
         dates: { type: Type.STRING, description: "The travel dates, e.g., '15th Oct - 20th Oct 2024'." },
-        paxCount: { type: Type.INTEGER, description: "Number of people (PAX) traveling." },
+        paxCount: { type: Type.INTEGER, description: "Total number of people traveling." },
+        adultsCount: { type: Type.INTEGER, description: "Number of adults." },
+        childrenCount: { type: Type.INTEGER, description: "Number of children." },
+        childAges: { type: Type.STRING, description: "Ages of children as a comma-separated string, e.g., '5, 8'. If no children, use an empty string." },
         numberOfRooms: { type: Type.INTEGER, description: "Number of rooms required." },
         mealPlan: { type: Type.STRING, description: "The meal plan included, e.g., 'Breakfast & Dinner'." },
         vehicle: { type: Type.STRING, description: "The type of vehicle provided for travel, e.g., 'Private Sedan'." },
@@ -33,7 +93,7 @@ const responseSchema = {
                     title: { type: Type.STRING, description: "A specific title indicating the main activity or theme of the day (e.g., 'Arrival in Paris'). DO NOT include 'Day X:' in the title string." },
                     points: {
                         type: Type.ARRAY,
-                        description: "A list of bullet points for the day. Start each point with '→ '. Content MUST be elaborate, technical (travel terminology), and there must be at least 3 points per day.",
+                        description: "A list of well-written bullet points for the day. Main points start with '→ ' (12-18 words each, good English). Sub-points start with '  • ' (indented). Use **bold** for tickets/meals. Write in good English with proper grammar. 4-6 points per day.",
                         items: { type: Type.STRING }
                     }
                 },
@@ -122,7 +182,7 @@ const responseSchema = {
             required: ["options"]
         }
     },
-    required: ["customerName", "destination", "duration", "dates", "mealPlan", "vehicle", "itinerary", "itineraryTitle", "showAccommodations", "hotels", "inclusions", "exclusions", "paxCount", "numberOfRooms", "hotelCategory", "costDetails", "isDomestic"]
+    required: ["customerName", "destination", "duration", "dates", "mealPlan", "vehicle", "itinerary", "itineraryTitle", "showAccommodations", "hotels", "inclusions", "exclusions", "paxCount", "numberOfRooms", "hotelCategory", "costDetails", "isDomestic", "adultsCount", "childrenCount", "childAges"]
 };
 
 // Enhanced Schema for Vendor Data Parsing to support multiple options and smart quantity
@@ -218,11 +278,15 @@ export const generateQuotationFromText = async (text: string): Promise<Quotation
   **CRITICAL INSTRUCTIONS FOR "INCLUSIONS"**:
   1. **Accommodations**: You MUST explicitly mention the split of nights if applicable. Format: "Accommodation in [City Name] for [N] Nights and [City Name] for [N] Nights".
   2. **Tours & Transfers**: If the input text mentions specific tours or transfer types (SIC/Private), you MUST list ALL of them in the inclusions, explicitly mentioning "(SIC)" or "(Private)" alongside the tour name.
+  3. **PAX Details**: Carefully extract the number of adults, number of children, and their ages if mentioned. set paxCount as the total SUM of adults and children.
   
   **CRITICAL INSTRUCTIONS FOR "ITINERARY"**:
-  1. **Detail Level**: Points must be elaborate and use professional travel industry terminology (e.g., "Private Transfer", "At Leisure", "Full Day Excursion", "Upon Arrival", "Check-in"). Avoid generic/lazy descriptions like "Visit city".
-  2. **Quantity**: You MUST generate at least 3 detailed bullet points for every single day.
-  3. **Format**: As per schema, start points with "→ ".
+  1. **Length & Quality**: Each point should be 12-18 words. Use good, clear English with proper grammar. Make it descriptive but still easy to read and understand.
+  2. **Structure**: Use main points with sub-points where needed. Format main points with "→ " and sub-points with "  • " (indented).
+  3. **Content Focus**: Highlight important sightseeing of the day. If tickets/entry passes are included, make those words BOLD using **text**. If meals are included, make meal names BOLD using **text**.
+  4. **Language Quality**: Write in good English with proper sentence structure. Use descriptive language that paints a clear picture of the activities. Avoid overly technical jargon, but maintain a professional tone.
+  5. **Quantity**: Generate 4-6 well-written points per day. Each point should be meaningful, informative, and provide good detail about the day's activities.
+  6. **Format**: Start main points with "→ ". Use sub-points with "  • " for additional details if needed.
 
   - **Accommodations (Structure)**: 
     - If the text implies "Hotels on your own" or "Accommodation not included", set 'showAccommodations' to false.
@@ -231,13 +295,15 @@ export const generateQuotationFromText = async (text: string): Promise<Quotation
   `;
 
     try {
-        const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
-            contents: prompt,
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: responseSchema,
-            },
+        const response = await retryWithBackoff(async () => {
+            return await ai.models.generateContent({
+                model: "gemini-2.5-flash",
+                contents: prompt,
+                config: {
+                    responseMimeType: "application/json",
+                    responseSchema: responseSchema,
+                },
+            });
         });
 
         const responseText = response.text?.trim() || "{}";
@@ -245,6 +311,12 @@ export const generateQuotationFromText = async (text: string): Promise<Quotation
         return JSON.parse(responseText) as QuotationData;
     } catch (error: any) {
         console.error("Error parsing quotation:", error);
+        
+        // Check if it's a 503 error and provide a user-friendly message
+        if (is503Error(error)) {
+            throw new Error("The AI model is currently overloaded. Please try again in a few moments.");
+        }
+        
         throw new Error(`Failed to generate quotation: ${error.message || "Unknown error"}`);
     }
 };
@@ -284,13 +356,15 @@ export const parseExistingQuotationText = async (text: string): Promise<Quotatio
     `;
 
     try {
-        const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
-            contents: prompt,
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: responseSchema,
-            },
+        const response = await retryWithBackoff(async () => {
+            return await ai.models.generateContent({
+                model: "gemini-2.5-flash",
+                contents: prompt,
+                config: {
+                    responseMimeType: "application/json",
+                    responseSchema: responseSchema,
+                },
+            });
         });
 
         const responseText = response.text?.trim() || "{}";
@@ -298,6 +372,11 @@ export const parseExistingQuotationText = async (text: string): Promise<Quotatio
         return JSON.parse(responseText) as QuotationData;
     } catch (error: any) {
         console.error("Error restoring quotation:", error);
+        
+        if (is503Error(error)) {
+            throw new Error("The AI model is currently overloaded. Please try again in a few moments.");
+        }
+        
         throw new Error(`Failed to restore quotation: ${error.message || "Unknown error"}`);
     }
 };
@@ -321,19 +400,26 @@ export const modifyQuotationWithAI = async (currentData: QuotationData, instruct
     `;
 
     try {
-        const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
-            contents: prompt,
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: responseSchema,
-            },
+        const response = await retryWithBackoff(async () => {
+            return await ai.models.generateContent({
+                model: "gemini-2.5-flash",
+                contents: prompt,
+                config: {
+                    responseMimeType: "application/json",
+                    responseSchema: responseSchema,
+                },
+            });
         });
 
         const responseText = response.text?.trim() || "{}";
         return JSON.parse(responseText) as QuotationData;
     } catch (error: any) {
         console.error("Error modifying quotation:", error);
+        
+        if (is503Error(error)) {
+            throw new Error("The AI model is currently overloaded. Please try again in a few moments.");
+        }
+        
         throw new Error(`Failed to modify quotation: ${error.message}`);
     }
 };
@@ -463,6 +549,15 @@ export const reprocessVendorDataWithClarification = async (originalText: string,
 };
 
 export const generateVendorEmail = async (requirements: string): Promise<{ subject: string, htmlBody: string }> => {
+    // Validate API key
+    if (!API_KEY) {
+        throw new Error("Gemini API key is not configured. Please set VITE_GEMINI_API_KEY environment variable.");
+    }
+
+    if (!requirements || !requirements.trim()) {
+        throw new Error("Requirements cannot be empty");
+    }
+
     const prompt = `
     You are a professional travel agency operations manager. Write a concise email to a B2B vendor/DMC requesting a quotation.
     
@@ -486,12 +581,61 @@ export const generateVendorEmail = async (requirements: string): Promise<{ subje
         const response = await ai.models.generateContent({
             model: "gemini-2.5-flash",
             contents: prompt,
-            config: { responseMimeType: "application/json" }
+            config: { 
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                        subject: { type: Type.STRING },
+                        htmlBody: { type: Type.STRING }
+                    },
+                    required: ["subject", "htmlBody"]
+                }
+            }
         });
-        return JSON.parse(response.text || '{}');
-    } catch (error) {
-        console.error(error);
-        throw new Error("Failed to generate email");
+
+        // Access response text
+        let responseText: string = '';
+        if (typeof response.text === 'string') {
+            responseText = response.text.trim();
+        } else if (response.text) {
+            // response.text might be a getter or property
+            responseText = String(response.text).trim();
+        } else {
+            console.error("Unexpected response structure:", response);
+            throw new Error("Unexpected response format from AI service");
+        }
+        
+        if (!responseText || responseText === '{}') {
+            console.error("Empty response from API. Full response:", JSON.stringify(response, null, 2));
+            throw new Error("Received empty response from AI service. Please check your API key and try again.");
+        }
+
+        if (!responseText.startsWith('{')) {
+            console.error("Invalid JSON response. Response text:", responseText.substring(0, 200));
+            throw new Error(`Invalid response format. Expected JSON but got: ${responseText.substring(0, 100)}...`);
+        }
+
+        let parsed;
+        try {
+            parsed = JSON.parse(responseText);
+        } catch (parseError: any) {
+            console.error("JSON parse error. Response text:", responseText);
+            throw new Error(`Failed to parse JSON response: ${parseError.message}`);
+        }
+        
+        if (!parsed.subject || !parsed.htmlBody) {
+            console.error("Missing required fields in response:", parsed);
+            throw new Error("Response missing required fields (subject or htmlBody)");
+        }
+
+        return parsed;
+    } catch (error: any) {
+        console.error("Error generating vendor email:", error);
+        const errorMessage = error?.message || "Unknown error";
+        const errorDetails = error?.response?.data || error?.response || error;
+        console.error("Error details:", errorDetails);
+        throw new Error(`Failed to generate email: ${errorMessage}`);
     }
 };
 
@@ -665,7 +809,7 @@ export const generateSmartQuoteSummary = async (data: QuotationData): Promise<st
 
     try {
         const response = await ai.models.generateContent({
-            model: "gemini-2.0-flash",
+            model: "gemini-2.5-flash",
             contents: prompt,
         });
         return response.text?.trim() || '';
@@ -700,7 +844,7 @@ export const parsePaymentImage = async (imageFile: File): Promise<any> => {
         `;
 
         const response = await ai.models.generateContent({
-            model: "gemini-2.0-flash",
+            model: "gemini-2.5-flash",
             contents: {
                 role: 'user',
                 parts: [

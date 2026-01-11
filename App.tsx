@@ -34,12 +34,12 @@ import FileSaver from 'file-saver';
 
 // Initial States
 const initialPaymentBankDetails: PaymentBankDetails = {
-    accountHolder: 'tripexplore.in',
+    accountHolder: 'Vishwanathan | +91-8884016046 |',
     accountNumber: '2612421112',
     bankName: 'Kotak Mahindra Bank',
     ifscCode: 'KKBK0000463',
     accountType: 'Current Account',
-    gpayNumber: '9841291289',
+    gpayNumber: '8884016046',
     companyName: 'TripExplore'
 };
 

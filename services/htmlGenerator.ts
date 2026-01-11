@@ -24,7 +24,10 @@ export const generateQuotationHtml = (data: QuotationData, paymentDetails: Payme
         costDetails,
         paxCount,
         marginPercentage,
-        isDomestic
+        isDomestic,
+        adultsCount,
+        childrenCount,
+        childAges
     } = data;
 
     // --- Helper: Financial Calculations (Mirrors App.tsx/docxGenerator.ts) ---
@@ -119,7 +122,7 @@ export const generateQuotationHtml = (data: QuotationData, paymentDetails: Payme
             /* Section Titles */
             .section-title { 
                 color: #003366; 
-                font-size: 24px; 
+                font-size: 26px; /* Increased from 24px */
                 font-weight: 700; 
                 border-bottom: 3px solid #00AEEF; 
                 padding-bottom: 5px; 
@@ -133,11 +136,11 @@ export const generateQuotationHtml = (data: QuotationData, paymentDetails: Payme
                 margin-bottom: 15px; 
             }
             .problem-block {
-                margin-bottom: 10px; /* Reduced gap */
+                margin-bottom: 10px; 
             }
-            .problem-title { color: #00AEEF; font-size: 26px; font-weight: 800; margin-bottom: 5px; }
-            .reality-title { font-weight: 700; font-size: 18px; margin-top: 10px; color: #111; }
-            .solution-text { color: #444; font-size: 16px; margin-bottom: 5px; }
+            .problem-title { color: #00AEEF; font-size: 28px; font-weight: 800; margin-bottom: 5px; } /* Increased from 26px */
+            .reality-title { font-weight: 700; font-size: 20px; margin-top: 10px; color: #111; } /* Increased from 18px */
+            .solution-text { color: #444; font-size: 18px; margin-bottom: 5px; } /* Increased from 16px */
             
             /* Separators */
             /* Lightweight separator for later sections (not used around banners/text) */
@@ -156,7 +159,7 @@ export const generateQuotationHtml = (data: QuotationData, paymentDetails: Payme
                 padding-top: 10px;
             }
             .itinerary-main-title {
-                font-size: 28px;
+                font-size: 30px; /* Increased from 28px */
                 font-weight: 800;
                 color: #1f2937;
                 text-transform: uppercase;
@@ -179,7 +182,7 @@ export const generateQuotationHtml = (data: QuotationData, paymentDetails: Payme
             }
 
             .day-title-text {
-                font-size: 20px; /* Larger than points */
+                font-size: 22px; /* Increased from 20px */
                 font-weight: 800;
                 color: #0c4a6e; /* Dark Blue */
             }
@@ -194,7 +197,7 @@ export const generateQuotationHtml = (data: QuotationData, paymentDetails: Payme
                 position: relative; 
                 padding-left: 25px; 
                 margin-bottom: 12px; 
-                font-size: 16px; 
+                font-size: 18px; /* Increased from 16px */
                 color: #374151;
             }
             .itinerary-item::before { 
@@ -207,7 +210,7 @@ export const generateQuotationHtml = (data: QuotationData, paymentDetails: Payme
             }
 
             /* Tables */
-            table { width: 100%; border-collapse: collapse; margin-bottom: 25px; font-size: 14px; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 25px; font-size: 16px; } /* Increased from 14px */
             th, td { border: 1px solid #d1d5db; padding: 12px; text-align: left; }
             th { background-color: #f3f4f6; font-weight: 700; color: #111; }
             
@@ -239,8 +242,11 @@ export const generateQuotationHtml = (data: QuotationData, paymentDetails: Payme
 
             <!-- Collaboration Message -->
             <div class="text-center" style="margin: 15px 0;">
-                <p style="font-size: 14px; color: #555; margin: 0;">
-                    <i>🤝 In <u>collaboration</u> with our trusted partners at <span style="background-color: #fef08a; padding: 0 4px; color: black; font-weight: 600;">${paymentDetails.companyName}</span> – crafting seamless travel experiences.</i>
+                <p style="font-size: 18px; color: #333; margin: 0; font-weight: bold; font-style: italic;">
+                    🤝 In <span style="background-color: #ffff00; padding: 0 4px;">collaboration</span> with our trusted partners at TripExplore – crafting seamless travel experiences together.
+                </p>
+                <p style="font-size: 16px; color: #0000FF; margin: 10px 0 0 0;">
+                    🔗 Know more about them at: <a href="https://www.tripexplore.in" style="color: #0000FF; text-decoration: underline;">www.tripexplore.in</a>
                 </p>
             </div>
 
@@ -287,6 +293,7 @@ export const generateQuotationHtml = (data: QuotationData, paymentDetails: Payme
 
             <!-- Info Grid -->
             <div style="background-color: #f0f9ff; padding: 25px; border-radius: 12px; border: 1px solid #bae6fd; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 40px;">
+                <div><b>👥 PAX:</b> ${adultsCount || 0} Adults + ${childrenCount || 0} Child ${childAges ? `(Age: ${childAges})` : ''}</div>
                 <div><b>📍 Destination:</b> ${destination}</div>
                 <div><b>⏳ Duration:</b> ${duration}</div>
                 <div><b>🗓️ Dates:</b> ${dates}</div>
@@ -394,6 +401,36 @@ export const generateQuotationHtml = (data: QuotationData, paymentDetails: Payme
             
             <hr class="separator-line" style="margin: 30px 0;" />
 
+            <!-- Package Cost Summary -->
+            ${financials && financials.length > 0 ? `
+                <h3 class="section-title">💰 Package Cost Summary</h3>
+                <div style="margin: 20px 0;">
+                    ${financials.map((opt: any, i: number) => {
+                        const costPerHead = opt.netCostPerPerson + opt.addOnCost;
+                        const totalCostForPax = costPerHead * paxCount;
+                        return `
+                            <div style="background: #DBEAFE; border: 2px solid #93C5FD; border-radius: 12px; padding: 20px; margin-bottom: 20px;">
+                                <h4 style="font-weight: bold; font-size: 18px; margin-bottom: 15px; text-align: center; color: #1E293B;">${opt.label || `Option ${i + 1}`}</h4>
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 15px;">
+                                    <div>
+                                        <p style="color: #64748B; font-size: 14px; margin-bottom: 5px;">Cost Per Head</p>
+                                        <p style="font-weight: bold; font-size: 20px; color: #1E40AF;">INR ${costPerHead.toLocaleString('en-IN')}</p>
+                                    </div>
+                                    <div>
+                                        <p style="color: #64748B; font-size: 14px; margin-bottom: 5px;">Total Cost for ${paxCount} Pax</p>
+                                        <p style="font-weight: bold; font-size: 20px; color: #15803D;">INR ${totalCostForPax.toLocaleString('en-IN')}</p>
+                                    </div>
+                                </div>
+                                <div style="border-top: 1px solid #93C5FD; padding-top: 15px; text-align: center;">
+                                    <p style="color: #374151; font-size: 14px; font-style: italic;">GST additional at 5% and is subject to RBI regulations.</p>
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+                <hr class="separator-line" style="margin: 30px 0;" />
+            ` : ''}
+
             <!-- Inclusions -->
             <h3 class="section-title">✅ Inclusions</h3>
             <ul class="list-check" style="list-style: none; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
@@ -496,20 +533,33 @@ export const generateQuotationHtml = (data: QuotationData, paymentDetails: Payme
             <div class="text-center" style="margin-top: 50px;">
                 <p style="margin-bottom: 20px; color: #6b7280; font-style: italic;">📞 For details or booking confirmation, please contact us.</p>
                 <div style="display: flex; justify-content: center; gap: 20px; margin-top: 20px;">
-                <div style="display: flex; justify-content: center; gap: 20px; margin-top: 20px;">
-                    <a href="tel:${paymentDetails.gpayNumber.replace(/\s+/g, '')}" style="text-decoration: none;">
-                        <img src="https://res.cloudinary.com/dnauowwb0/image/upload/v1767504923/Call-Now-Button_gq6urr.png" alt="Call Now" style="height: 50px;" />
+                    <a href="tel:8884016046" style="text-decoration: none;">
+                        <img src="https://res.cloudinary.com/dnauowwb0/image/upload/v1767504923/Call-Now-Button_gq6urr.png" alt="Call Now" style="height: 70px;" />
                     </a>
-                    <a href="https://wa.me/${paymentDetails.gpayNumber.replace(/[^0-9]/g, '')}" style="text-decoration: none;">
-                        <img src="https://res.cloudinary.com/dnauowwb0/image/upload/v1767504923/Whatsapp-Button_kuwlcf.png" alt="WhatsApp" style="height: 50px;" />
+                    <a href="https://wa.me/8884016046" style="text-decoration: none;">
+                        <img src="https://res.cloudinary.com/dnauowwb0/image/upload/v1767504923/Whatsapp-Button_kuwlcf.png" alt="WhatsApp" style="height: 79px;" />
                     </a>
                 </div>
-                </div>
-                <p style="margin-top: 30px; font-weight: bold; color: #1e3a8a; font-size: 20px;">${paymentDetails.accountHolder}</p>
+                <p style="margin-top: 30px; font-weight: bold; color: #1e3a8a; font-size: 22px;">Vishwanathan | +91-8884016046 |</p>
             </div>
 
-            <img src="${HEADER_IMG_URL}" class="trip-explore-banner" style="margin-top: 40px;" alt="Footer Banner" />
+            <img src="${HEADER_IMG_URL}" class="trip-explore-banner" style="margin-top: 40px; margin-bottom: 40px;" alt="Footer Banner" />
 
+            <!-- TCS Rules Section -->
+            <div style="margin-top: 40px; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px; font-size: 16px;">
+                <h2 style="font-size: 22px; color: #1f2937; margin-top: 0;">TCS Rules</h2>
+                <p><b>Note:</b> Effective 01 October 2023, Tax Collected at Source (TCS) shall be applicable as follows for Overseas Tour Packages / Cruises:</p>
+                <ul style="margin-bottom: 20px;">
+                    <li>5% TCS on cumulative payments up to ₹7,00,000</li>
+                    <li>20% TCS on amounts exceeding ₹7,00,000</li>
+                </ul>
+                <p>This limit applies to all cumulative payments made against a PAN within the same Financial Year. The buyer is required to furnish an undertaking declaring their total spends on overseas tour packages/cruises during the financial year.</p>
+                <p>The Government of India, Ministry of Finance, via Circular No. 10 of 2023 (F. No. 370142/12/2023-TPL) dated 30 June 2023, has clarified that:</p>
+                <ul>
+                    <li>The undertaking must be furnished by the buyer</li>
+                    <li>Any false declaration will attract appropriate action under the Finance Act, 2023, as per the amended sub-section (1G) of Section 206C of the Income-tax Act, 1961</li>
+                </ul>
+            </div>
         </div>
     </body>
     </html>

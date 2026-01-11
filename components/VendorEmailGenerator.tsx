@@ -115,9 +115,10 @@ const VendorEmailGenerator: React.FC<VendorEmailGeneratorProps> = ({ state, onCh
                 history: [newRevision, ...(state.history || [])]
             });
 
-        } catch (e) {
-            console.error(e);
-            alert("Failed to generate email");
+        } catch (e: any) {
+            console.error("Email generation error:", e);
+            const errorMessage = e?.message || "Unknown error occurred";
+            alert(`Failed to generate email: ${errorMessage}`);
         } finally {
             setLoading(false);
         }

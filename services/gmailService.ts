@@ -1,4 +1,4 @@
-import { initGoogleDrive, getIsSignedIn, signInToGoogle } from './googleDriveService';
+import { initGoogleDrive, getIsSignedIn, signInToGoogle, fetchGoogleApi } from './googleDriveService';
 
 // We rely on the global 'gapi' loaded via script tag in index.html for stability
 declare var gapi: any;
@@ -31,51 +31,42 @@ export const sendGmail = async (to: string, subject: string, htmlBody: string, t
         .replace(/\//g, '_')
         .replace(/=+$/, '');
 
-    const requestBody: any = {
-        'userId': 'me',
-        'resource': {
+    await fetchGoogleApi('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            'threadId': threadId,
             'raw': encodedMessage
-        }
-    };
-
-    if (threadId) {
-        requestBody.resource.threadId = threadId;
-    }
-
-    await gapi.client.gmail.users.messages.send(requestBody);
+        })
+    });
 };
 
 export const listGmailThreads = async (query: string = '', maxResults: number = 10) => {
     await ensureAuth();
 
-    const response = await gapi.client.gmail.users.threads.list({
-        'userId': 'me',
-        'q': query,
-        'maxResults': maxResults
+    const queryParams = new URLSearchParams({
+        q: query,
+        maxResults: maxResults.toString()
     });
+    const url = `https://gmail.googleapis.com/gmail/v1/users/me/threads?${queryParams.toString()}`;
+    const response = await fetchGoogleApi(url);
 
-    return response.result.threads || [];
+    return response.threads || [];
 };
 
 export const getGmailThread = async (threadId: string) => {
     await ensureAuth();
 
-    const response = await gapi.client.gmail.users.threads.get({
-        'userId': 'me',
-        'id': threadId,
-        'format': 'full' // Get full content to display headers/body
-    });
-
-    return response.result;
+    const url = `https://gmail.googleapis.com/gmail/v1/users/me/threads/${threadId}?format=full`;
+    return await fetchGoogleApi(url);
 };
 
 export const getGmailSignature = async (): Promise<string> => {
     await ensureAuth();
     try {
-        const response = await gapi.client.gmail.users.settings.sendAs.list({
-            'userId': 'me'
-        });
-        const aliases = response.result.sendAs || [];
+        const url = `https://gmail.googleapis.com/gmail/v1/users/me/settings/sendAs`;
+        const response = await fetchGoogleApi(url);
+        const aliases = response.sendAs || [];
         // Find primary or first alias with a signature
         const primary = aliases.find((a: any) => a.isPrimary) || aliases[0];
         return primary ? primary.signature : '';

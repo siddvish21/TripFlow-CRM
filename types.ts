@@ -150,6 +150,9 @@ export interface QuotationData {
     inclusions: string[];
     exclusions: string[];
     paxCount: number;
+    adultsCount?: number;
+    childrenCount?: number;
+    childAges?: string;
     numberOfRooms: number;
     hotelCategory: string;
     costDetails: CostDetails;

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { QuotationData, QuotationSnapshot, CalculatorState, PaymentBankDetails } from '../types';
-import { DestinationIcon, DurationIcon, CalendarIcon, MealIcon, VehicleIcon } from './Icons';
+import { DestinationIcon, DurationIcon, CalendarIcon, MealIcon, VehicleIcon, PaxIcon, SyncIcon } from './Icons';
 import { getPartnerBannerBase64 } from '../services/imageService';
 import { auditItinerary } from '../services/geminiService';
 import { generateQuotationHtml } from '../services/htmlGenerator';
@@ -147,6 +147,103 @@ const QuotationPreview: React.FC<QuotationPreviewProps> = ({
             const newExclusions = [...data.exclusions];
             newExclusions[index] = newValue;
             onUpdate({ ...data, exclusions: newExclusions });
+        }
+    }
+
+    // Helper to ensure financialBreakdown exists, creating it from current financials if needed
+    const ensureFinancialBreakdown = () => {
+        if (!data) return null;
+        
+        if (data.financialBreakdown && data.financialBreakdown.options.length > 0) {
+            return data.financialBreakdown;
+        }
+        
+        // Create financialBreakdown from current financials or costDetails
+        if (financials && financials.length > 0) {
+            const firstOpt = financials[0];
+            return {
+                options: financials.map((opt: any) => ({
+                    label: opt.label || "Option 1",
+                    landBaseCost: opt.perPersonCost || 0,
+                    landGST: opt.gstAmount || 0,
+                    landTCS: opt.tcsAmount || 0,
+                    addOnCost: opt.addOnCost || 0,
+                    extractedNetCost: opt.netCostPerPerson || undefined,
+                    childCosts: opt.childCosts || []
+                }))
+            };
+        }
+        
+        // Fallback: create from costDetails
+        const { costDetails, marginPercentage, isDomestic } = data;
+        const perPersonCost = costDetails?.perPersonCost || 0;
+        const gstPercentage = costDetails?.gstPercentage || 5;
+        const marginAmount = perPersonCost * ((marginPercentage || 0) / 100);
+        const costWithMargin = perPersonCost + marginAmount;
+        const gstAmount = costWithMargin * (gstPercentage / 100);
+        const tcsPercentage = isDomestic ? 0 : (costDetails?.tcsPercentage || 5);
+        const tcsAmount = (costWithMargin + gstAmount) * (tcsPercentage / 100);
+        const netCostPerPerson = costWithMargin + gstAmount + tcsAmount;
+        
+        return {
+            options: [{
+                label: "Option 1",
+                landBaseCost: Math.round(perPersonCost),
+                landGST: Math.round(gstAmount),
+                landTCS: Math.round(tcsAmount),
+                addOnCost: 0,
+                extractedNetCost: Math.round(netCostPerPerson),
+                childCosts: []
+            }]
+        };
+    }
+
+    // Financial breakdown update handlers
+    const handleFinancialOptionLabelUpdate = (optionIndex: number, newValue: string) => {
+        if (!data) return;
+        const breakdown = ensureFinancialBreakdown();
+        if (!breakdown) return;
+        
+        const newBreakdown = { ...breakdown };
+        const newOptions = [...newBreakdown.options];
+        if (newOptions[optionIndex]) {
+            newOptions[optionIndex] = { ...newOptions[optionIndex], label: newValue };
+            newBreakdown.options = newOptions;
+            onUpdate({ ...data, financialBreakdown: newBreakdown });
+        }
+    }
+
+    const handleFinancialFieldUpdate = (optionIndex: number, field: 'landBaseCost' | 'landGST' | 'landTCS' | 'addOnCost' | 'extractedNetCost', newValue: string) => {
+        if (!data) return;
+        const breakdown = ensureFinancialBreakdown();
+        if (!breakdown) return;
+        
+        const newBreakdown = { ...breakdown };
+        const newOptions = [...newBreakdown.options];
+        if (newOptions[optionIndex]) {
+            const numValue = Math.round(parseFloat(newValue.replace(/,/g, '')) || 0);
+            newOptions[optionIndex] = { ...newOptions[optionIndex], [field]: numValue };
+            newBreakdown.options = newOptions;
+            onUpdate({ ...data, financialBreakdown: newBreakdown });
+        }
+    }
+
+    const handleChildCostUpdate = (optionIndex: number, childIndex: number, field: 'landBaseCost' | 'landGST' | 'landTCS' | 'netCost', newValue: string) => {
+        if (!data) return;
+        const breakdown = ensureFinancialBreakdown();
+        if (!breakdown) return;
+        
+        const newBreakdown = { ...breakdown };
+        const newOptions = [...newBreakdown.options];
+        const option = { ...newOptions[optionIndex] };
+        const newChildCosts = [...(option.childCosts || [])];
+        if (newChildCosts[childIndex]) {
+            const numValue = Math.round(parseFloat(newValue.replace(/,/g, '')) || 0);
+            newChildCosts[childIndex] = { ...newChildCosts[childIndex], [field]: numValue };
+            option.childCosts = newChildCosts;
+            newOptions[optionIndex] = option;
+            newBreakdown.options = newOptions;
+            onUpdate({ ...data, financialBreakdown: newBreakdown });
         }
     }
 
@@ -432,15 +529,15 @@ const QuotationPreview: React.FC<QuotationPreviewProps> = ({
                     <img src={TOP_HEADER_IMG_URL} alt="Top Header" className="w-full h-auto mb-2 rounded-t-md shadow-sm" style={{ maxHeight: '200px', objectFit: 'cover' }} />
 
                     {/* 2. Collaboration Message */}
-                    <div className="text-center mb-1 text-gray-900" style={{ fontSize: '12pt' }}>
+                    <div className="text-center mb-1 text-gray-900" style={{ fontSize: '14pt' }}>
                         <p className="font-lexend font-bold italic">
-                            🤝In <span className="underline">collaboration</span> with our trusted partners at <span className="underline" style={{ backgroundColor: 'yellow', color: 'black' }}>TripExplore</span> – crafting seamless travel experiences together.
+                            🤝In <span className="underline font-bold" style={{ backgroundColor: 'yellow', color: 'black', padding: '0 4px' }}>collaboration</span> with our trusted partners at TripExplore – crafting seamless travel experiences together.
                         </p>
                     </div>
 
                     {/* 3. Header Link */}
-                    <div className="text-center mb-4 text-gray-700" style={{ fontSize: '10pt' }}>
-                        🔗 Know more about them at: <a href="http://www.tripexplore.in" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-bold">www.tripexplore.in</a>
+                    <div className="text-center mb-4 text-gray-700" style={{ fontSize: '12pt' }}>
+                        🔗 Know more about them at: <a href="https://www.tripexplore.in" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-bold">www.tripexplore.in</a>
                     </div>
 
                     {/* 4. Updated Header Image from URL */}
@@ -501,7 +598,7 @@ const QuotationPreview: React.FC<QuotationPreviewProps> = ({
                     )}
 
                     <div className="text-center border-b-2 border-gray-200 pb-3 mb-8">
-                        <p className="text-2xl font-bold text-gray-900" style={{ fontSize: '18pt' }}>
+                        <p className="text-2xl font-bold text-gray-900" style={{ fontSize: '20pt' }}>
                             Quotation for Tour Package - <EditableField value={data.customerName} onSave={(v) => handleUpdate('customerName', v)} className="text-blue-700" />
                         </p>
                         {clientName && onSyncName && clientName.trim() !== data.customerName.trim() && (
@@ -515,7 +612,33 @@ const QuotationPreview: React.FC<QuotationPreviewProps> = ({
                         )}
                     </div>
 
-                    <div className="space-y-4 bg-gray-50 p-6 rounded-xl border border-gray-200 mb-8" style={{ fontSize: '14pt' }}>
+                    <div className="space-y-4 bg-gray-50 p-6 rounded-xl border border-gray-200 mb-8" style={{ fontSize: '16pt' }}>
+                        <p className="flex items-center text-gray-800"><PaxIcon className="w-6 h-6 mr-4 text-blue-600" /> <strong>PAX:</strong><span className="ml-2">
+                            <EditableField value={data.adultsCount || 0} onSave={(v) => {
+                                const adults = parseInt(v) || 0;
+                                const child = data.childrenCount || 0;
+                                onUpdate({ ...data, adultsCount: adults, paxCount: adults + child });
+                            }} isNumeric /> Adults + 
+                            <EditableField value={data.childrenCount || 0} onSave={(v) => {
+                                const child = parseInt(v) || 0;
+                                const adults = data.adultsCount || 0;
+                                onUpdate({ ...data, childrenCount: child, paxCount: adults + child });
+                            }} isNumeric /> Child 
+                            { (data.childrenCount || 0) > 0 && (
+                                <span className="text-gray-600 text-sm ml-2">
+                                    (Age: <EditableField value={data.childAges || ''} onSave={(v) => handleUpdate('childAges', v)} />)
+                                </span>
+                            )}
+                            {financialState?.aiParsedData?.totalPax && financialState.aiParsedData.totalPax !== data.paxCount && (
+                                <button 
+                                    onClick={() => onUpdate({ ...data, adultsCount: financialState.aiParsedData!.totalPax, childrenCount: 0, paxCount: financialState.aiParsedData!.totalPax })}
+                                    className="ml-4 inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded-md text-sm font-medium hover:bg-blue-200 transition-colors shadow-sm"
+                                    title="Sync PAX count from vendor data"
+                                >
+                                    <SyncIcon className="w-4 h-4" /> Sync ({financialState.aiParsedData.totalPax})
+                                </button>
+                            )}
+                        </span></p>
                         <p className="flex items-center text-gray-800"><DestinationIcon className="w-6 h-6 mr-4 text-red-500" /> <strong>Destination:</strong><span className="ml-2"><EditableField value={data.destination} onSave={(v) => handleUpdate('destination', v)} /></span></p>
                         <p className="flex items-center text-gray-800"><DurationIcon className="w-6 h-6 mr-4 text-blue-500" /> <strong>Duration:</strong><span className="ml-2"><EditableField value={data.duration} onSave={(v) => handleUpdate('duration', v)} /></span></p>
                         <p className="flex items-center text-gray-800"><CalendarIcon className="w-6 h-6 mr-4 text-green-500" /> <strong>Dates:</strong><span className="ml-2"><EditableField value={data.dates} onSave={(v) => handleUpdate('dates', v)} /></span></p>
@@ -523,7 +646,7 @@ const QuotationPreview: React.FC<QuotationPreviewProps> = ({
                         <p className="flex items-center text-gray-800"><VehicleIcon className="w-6 h-6 mr-4 text-purple-500" /> <strong>Vehicle:</strong><span className="ml-2"><EditableField value={data.vehicle} onSave={(v) => handleUpdate('vehicle', v)} /></span></p>
                     </div>
 
-                    {!destinationImage && <h2 className="text-2xl font-bold text-center my-6 text-gray-900" style={{ fontSize: '16pt' }}><EditableField value={data.itineraryTitle} onSave={(v) => handleUpdate('itineraryTitle', v)} /></h2>}
+                    {!destinationImage && <h2 className="text-2xl font-bold text-center my-6 text-gray-900" style={{ fontSize: '18pt' }}><EditableField value={data.itineraryTitle} onSave={(v) => handleUpdate('itineraryTitle', v)} /></h2>}
 
                     <div>
                         <div className="flex justify-between items-center mb-6">
@@ -536,22 +659,53 @@ const QuotationPreview: React.FC<QuotationPreviewProps> = ({
                         <div className="space-y-8">
                             {data.itinerary && data.itinerary.map((day, dayIndex) => (
                                 <div key={day.day} className="pb-8 border-b border-gray-200 border-dashed last:border-0">
-                                    <h3 className="text-xl font-bold mb-4 text-blue-800" style={{ fontSize: '15pt' }}>
+                                    <h3 className="text-xl font-bold mb-4 text-blue-800" style={{ fontSize: '17pt' }}>
                                         <EditableField
                                             value={`🗓️ Day ${day.day}: ${day.title}`}
                                             onSave={(v) => handleDayTitleUpdate(dayIndex, v.replace(/🗓️ Day \d+: /g, ''))}
                                         />
                                     </h3>
-                                    <ul className="space-y-3 pl-6 border-l-4 border-gray-100 ml-2" style={{ listStyle: 'none' }}>
-                                        {day.points && day.points.map((point, pointIndex) => (
-                                            <li key={pointIndex} className="text-gray-700 relative text-lg" style={{ fontSize: '13pt' }}>
-                                                <span className="absolute -left-8 top-2 w-3 h-3 bg-blue-400 rounded-full"></span>
-                                                <EditableField
-                                                    value={point}
-                                                    onSave={(v) => handleItineraryUpdate(dayIndex, pointIndex, v)}
-                                                />
-                                            </li>
-                                        ))}
+                                    <ul className="space-y-2 pl-6 border-l-4 border-gray-100 ml-2" style={{ listStyle: 'none' }}>
+                                        {day.points && day.points.map((point, pointIndex) => {
+                                            // Check if it's a sub-point (starts with spaces and bullet)
+                                            const isSubPoint = /^\s+[•·-]/.test(point) || point.trim().startsWith('•');
+                                            // Clean the point for display (remove → and leading spaces)
+                                            const cleanPoint = point.replace(/^[→•·-]\s*/, '').trim();
+                                            
+                                            return (
+                                                <li 
+                                                    key={pointIndex} 
+                                                    className={`text-gray-700 relative ${isSubPoint ? 'ml-6 text-sm' : 'text-lg'}`} 
+                                                    style={{ fontSize: isSubPoint ? '15pt' : '16pt' }}
+                                                >
+                                                    {!isSubPoint && <span className="absolute -left-8 top-2 w-3 h-3 bg-blue-400 rounded-full"></span>}
+                                                    <div className="flex items-start">
+                                                        {isSubPoint ? (
+                                                            <span className="mr-2 text-gray-500">•</span>
+                                                        ) : (
+                                                            <span className="mr-2 text-blue-500">→</span>
+                                                        )}
+                                                        <div className="flex-1">
+                                                            {/* Render with bold support - parse **text** to <strong> */}
+                                                            <span
+                                                                contentEditable
+                                                                suppressContentEditableWarning
+                                                                onBlur={(e) => {
+                                                                    let newText = e.currentTarget.textContent || '';
+                                                                    // Preserve formatting when saving
+                                                                    const prefix = isSubPoint ? '  • ' : '→ ';
+                                                                    handleItineraryUpdate(dayIndex, pointIndex, prefix + newText);
+                                                                }}
+                                                                className="px-1 rounded-md hover:bg-yellow-100 focus:bg-yellow-50 outline-none focus:ring-1 focus:ring-yellow-500"
+                                                                dangerouslySetInnerHTML={{
+                                                                    __html: cleanPoint.replace(/\*\*([^*]+)\*\*/g, '<strong class="font-bold text-gray-900">$1</strong>')
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </li>
+                                            );
+                                        })}
                                     </ul>
                                 </div>
                             ))}
@@ -562,7 +716,7 @@ const QuotationPreview: React.FC<QuotationPreviewProps> = ({
                     {/* Accommodations Table(s) */}
                     {showAccommodations !== false && (
                         <>
-                            <h3 className="text-2xl font-bold mb-8 text-gray-800 border-b-4 border-blue-500 pb-1 w-fit" style={{ fontSize: '16pt' }}>Your Accommodations</h3>
+                            <h3 className="text-2xl font-bold mb-8 text-gray-800 border-b-4 border-blue-500 pb-1 w-fit" style={{ fontSize: '18pt' }}>Your Accommodations</h3>
 
                             {data.hotelOptions && data.hotelOptions.length > 0 ? (
                                 data.hotelOptions.map((option, optIndex) => (
@@ -570,7 +724,7 @@ const QuotationPreview: React.FC<QuotationPreviewProps> = ({
                                         <h4 className="text-lg font-bold text-blue-700 mb-4 uppercase tracking-wide border-b border-gray-200 pb-2">
                                             <EditableField value={option.optionLabel} onSave={(v) => handleOptionLabelUpdate(optIndex, v)} />
                                         </h4>
-                                        <table className="w-full text-left border-collapse" style={{ fontSize: '12pt' }}>
+                                        <table className="w-full text-left border-collapse" style={{ fontSize: '14pt' }}>
                                             <thead>
                                                 <tr className="bg-gray-200 text-gray-700 text-sm uppercase">
                                                     <th className="p-4 border-b border-gray-300 w-[25%]">Destination</th>
@@ -595,7 +749,7 @@ const QuotationPreview: React.FC<QuotationPreviewProps> = ({
                             ) : (
                                 data.hotels && data.hotels.length > 0 && (
                                     <div className="bg-gray-50 p-6 rounded-xl border border-gray-200 my-6">
-                                        <table className="w-full text-left border-collapse" style={{ fontSize: '12pt' }}>
+                                        <table className="w-full text-left border-collapse" style={{ fontSize: '14pt' }}>
                                             <thead>
                                                 <tr className="bg-gray-200 text-gray-700 text-sm uppercase">
                                                     <th className="p-4 border-b border-gray-300 w-[25%]">Destination</th>
@@ -622,8 +776,45 @@ const QuotationPreview: React.FC<QuotationPreviewProps> = ({
                         </>
                     )}
 
-                    <h3 className="text-2xl font-bold mb-6 text-gray-800 border-b-4 border-green-500 pb-1 w-fit" style={{ fontSize: '16pt' }}>✅ Inclusions</h3>
-                    <ul className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10" style={{ fontSize: '13pt' }}>
+                    {/* Cost Summary Section - Before Inclusions */}
+                    {financials && financials.length > 0 && (
+                        <>
+                            <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-6 mb-10" style={{ fontSize: '16pt' }}>
+                                <h3 className="text-2xl font-bold mb-6 text-gray-800 border-b-4 border-blue-500 pb-2 w-fit" style={{ fontSize: '18pt' }}>💰 Package Cost Summary</h3>
+                                <div className="space-y-4">
+                                    {financials.map((opt: any, i: number) => {
+                                        // Get pax count from financialState if available, otherwise use data.paxCount
+                                        const paxFromFinancials = financialState?.configs?.block1?.pax || financialState?.configs?.block2?.pax || financialState?.configs?.block3?.pax || data.paxCount;
+                                        const costPerHead = opt.netCostPerPerson + opt.addOnCost;
+                                        const totalCostForPax = costPerHead * paxFromFinancials;
+                                        
+                                        return (
+                                            <div key={i} className="bg-white rounded-lg p-4 border border-blue-300">
+                                                <h4 className="font-bold text-lg mb-3 text-gray-800">{opt.label || `Option ${i + 1}`}</h4>
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    <div>
+                                                        <p className="text-gray-600 text-sm mb-1">Cost Per Head</p>
+                                                        <p className="font-bold text-xl text-blue-900">INR {costPerHead.toLocaleString('en-IN')}</p>
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-gray-600 text-sm mb-1">Total Cost for <EditableField value={paxFromFinancials} onSave={(v) => handleUpdate('paxCount', parseInt(v) || 1)} isNumeric className="font-bold" /> Pax</p>
+                                                        <p className="font-bold text-xl text-green-700">INR {totalCostForPax.toLocaleString('en-IN')}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="mt-4 pt-4 border-t border-blue-200">
+                                                    <p className="text-gray-700 text-sm italic">GST additional at 5% and is subject to RBI regulations.</p>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                            <hr className="my-10 border-gray-200 border-2" />
+                        </>
+                    )}
+
+                    <h3 className="text-2xl font-bold mb-6 text-gray-800 border-b-4 border-green-500 pb-1 w-fit" style={{ fontSize: '18pt' }}>✅ Inclusions</h3>
+                    <ul className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10" style={{ fontSize: '15pt' }}>
                         {data.inclusions && data.inclusions.map((inclusion, index) => (
                             <li key={index} className="flex items-start bg-green-50 p-3 rounded-lg border border-green-100 text-gray-800">
                                 <span className="mr-3 text-green-600 font-bold">✓</span>
@@ -634,20 +825,31 @@ const QuotationPreview: React.FC<QuotationPreviewProps> = ({
                     <hr className="my-10 border-gray-200 border-2" />
 
                     {/* Rate Details Table */}
-                    <h3 className="text-2xl font-bold mb-6 text-gray-800 border-b-4 border-yellow-500 pb-1 w-fit" style={{ fontSize: '16pt' }}>Rate Details</h3>
+                    <h3 className="text-2xl font-bold mb-6 text-gray-800 border-b-4 border-yellow-500 pb-1 w-fit" style={{ fontSize: '18pt' }}>Rate Details</h3>
                     {/* Redesigned Rate Details Table */}
                     <div className="space-y-12">
                         {financials.map((opt, i) => {
                             const child = opt.childCosts && opt.childCosts.length > 0 ? opt.childCosts[0] : null;
-                            const adultCount = data.paxCount;
+                            // Get pax count from financialState (financials tab) if available, otherwise use data.paxCount
+                            const paxFromFinancials = financialState?.configs?.block1?.pax || 
+                                                      financialState?.configs?.block2?.pax || 
+                                                      financialState?.configs?.block3?.pax || 
+                                                      data.paxCount;
+                            const adultCount = paxFromFinancials;
                             const adultSubtotal = (opt.netCostPerPerson + opt.addOnCost) * adultCount;
                             const childSubtotal = child ? (child.netCost + opt.addOnCost) * 1 : 0;
                             const grandTotal = adultSubtotal + childSubtotal;
 
                             return (
                                 <div key={i} className="overflow-x-auto bg-gray-50 rounded-xl border-2 border-gray-200 shadow-sm mb-10">
-                                    <h4 className="bg-gray-800 text-white p-4 font-bold text-lg text-center">{opt.label || `Option ${i + 1}`}</h4>
-                                    <table className="w-full text-left border-collapse" style={{ fontSize: '13pt' }}>
+                                    <h4 className="bg-gray-800 text-white p-4 font-bold text-lg text-center">
+                                        <EditableField 
+                                            value={opt.label || `Option ${i + 1}`} 
+                                            onSave={(v) => handleFinancialOptionLabelUpdate(i, v)} 
+                                            className="text-white bg-transparent hover:bg-gray-700"
+                                        />
+                                    </h4>
+                                    <table className="w-full text-left border-collapse" style={{ fontSize: '15pt' }}>
                                         <thead>
                                             <tr className="bg-gray-100 text-gray-800 border-b-2 border-gray-300">
                                                 <th className="p-4 border-r border-gray-300 w-[40%]">Description</th>
@@ -663,32 +865,131 @@ const QuotationPreview: React.FC<QuotationPreviewProps> = ({
                                             </tr>
                                             <tr className="border-b border-gray-200">
                                                 <td className="p-4 border-r border-gray-200">Base Package Cost</td>
-                                                <td className="p-4 border-r border-gray-200 text-center">INR {opt.perPersonCost.toLocaleString('en-IN')}</td>
-                                                <td className="p-4 text-center">{child ? `INR ${child.landBaseCost.toLocaleString('en-IN')}` : "-"}</td>
+                                                <td className="p-4 border-r border-gray-200 text-center">
+                                                    INR <EditableField 
+                                                        value={opt.perPersonCost} 
+                                                        onSave={(v) => handleFinancialFieldUpdate(i, 'landBaseCost', v)} 
+                                                        isNumeric 
+                                                    />
+                                                </td>
+                                                <td className="p-4 text-center">
+                                                    {child ? (
+                                                        <>INR <EditableField 
+                                                            value={child.landBaseCost} 
+                                                            onSave={(v) => handleChildCostUpdate(i, 0, 'landBaseCost', v)} 
+                                                            isNumeric 
+                                                        /></>
+                                                    ) : "-"}
+                                                </td>
                                             </tr>
                                             <tr className="border-b border-gray-200">
                                                 <td className="p-4 border-r border-gray-200">GST (5%)</td>
-                                                <td className="p-4 border-r border-gray-200 text-center">INR {opt.gstAmount.toLocaleString('en-IN')}</td>
-                                                <td className="p-4 text-center">{child ? `INR ${child.landGST.toLocaleString('en-IN')}` : "-"}</td>
+                                                <td className="p-4 border-r border-gray-200 text-center">
+                                                    INR <EditableField 
+                                                        value={opt.gstAmount} 
+                                                        onSave={(v) => handleFinancialFieldUpdate(i, 'landGST', v)} 
+                                                        isNumeric 
+                                                    />
+                                                </td>
+                                                <td className="p-4 text-center">
+                                                    {child ? (
+                                                        <>INR <EditableField 
+                                                            value={child.landGST} 
+                                                            onSave={(v) => handleChildCostUpdate(i, 0, 'landGST', v)} 
+                                                            isNumeric 
+                                                        /></>
+                                                    ) : "-"}
+                                                </td>
                                             </tr>
                                             <tr className="border-b border-gray-200">
                                                 <td className="p-4 border-r border-gray-200">TCS (5%)</td>
-                                                <td className="p-4 border-r border-gray-200 text-center">INR {opt.tcsAmount.toLocaleString('en-IN')}</td>
-                                                <td className="p-4 text-center">{child ? `INR ${child.landTCS.toLocaleString('en-IN')}` : "-"}</td>
+                                                <td className="p-4 border-r border-gray-200 text-center">
+                                                    INR <EditableField 
+                                                        value={opt.tcsAmount} 
+                                                        onSave={(v) => handleFinancialFieldUpdate(i, 'landTCS', v)} 
+                                                        isNumeric 
+                                                    />
+                                                </td>
+                                                <td className="p-4 text-center">
+                                                    {child ? (
+                                                        <>INR <EditableField 
+                                                            value={child.landTCS} 
+                                                            onSave={(v) => handleChildCostUpdate(i, 0, 'landTCS', v)} 
+                                                            isNumeric 
+                                                        /></>
+                                                    ) : "-"}
+                                                </td>
                                             </tr>
                                             <tr className="bg-gray-200 font-bold border-b border-gray-300">
                                                 <td className="p-4 border-r border-gray-300">Net Package Cost (Per Head)</td>
-                                                <td className="p-4 border-r border-gray-300 text-center text-blue-800">INR {opt.netCostPerPerson.toLocaleString('en-IN')}</td>
-                                                <td className="p-4 text-center text-blue-800">{child ? `INR ${child.netCost.toLocaleString('en-IN')}` : "-"}</td>
+                                                <td className="p-4 border-r border-gray-300 text-center text-blue-800">
+                                                    INR <EditableField 
+                                                        value={opt.netCostPerPerson} 
+                                                        onSave={(v) => handleFinancialFieldUpdate(i, 'extractedNetCost', v)} 
+                                                        isNumeric 
+                                                        className="text-blue-800"
+                                                    />
+                                                </td>
+                                                <td className="p-4 text-center text-blue-800">
+                                                    {child ? (
+                                                        <>INR <EditableField 
+                                                            value={child.netCost} 
+                                                            onSave={(v) => handleChildCostUpdate(i, 0, 'netCost', v)} 
+                                                            isNumeric 
+                                                            className="text-blue-800"
+                                                        /></>
+                                                    ) : "-"}
+                                                </td>
                                             </tr>
                                             <tr className="border-b border-gray-200">
                                                 <td className="p-4 border-r border-gray-200 italic">Flight Cost Indicator</td>
-                                                <td className="p-4 border-r border-gray-200 text-center">{opt.addOnCost > 0 ? `INR ${opt.addOnCost.toLocaleString('en-IN')}` : "Excluded"}</td>
-                                                <td className="p-4 text-center">{opt.addOnCost > 0 ? `INR ${opt.addOnCost.toLocaleString('en-IN')}` : "Excluded"}</td>
+                                                <td className="p-4 border-r border-gray-200 text-center">
+                                                    {opt.addOnCost > 0 ? (
+                                                        <>INR <EditableField 
+                                                            value={opt.addOnCost} 
+                                                            onSave={(v) => handleFinancialFieldUpdate(i, 'addOnCost', v)} 
+                                                            isNumeric 
+                                                        /></>
+                                                    ) : (
+                                                        <>INR <EditableField 
+                                                            value={0} 
+                                                            onSave={(v) => handleFinancialFieldUpdate(i, 'addOnCost', v)} 
+                                                            isNumeric 
+                                                        /> <span className="text-xs text-gray-500">(click to edit)</span></>
+                                                    )}
+                                                </td>
+                                                <td className="p-4 text-center">
+                                                    {opt.addOnCost > 0 ? (
+                                                        <>INR <EditableField 
+                                                            value={opt.addOnCost} 
+                                                            onSave={(v) => handleFinancialFieldUpdate(i, 'addOnCost', v)} 
+                                                            isNumeric 
+                                                        /></>
+                                                    ) : (
+                                                        <>INR <EditableField 
+                                                            value={0} 
+                                                            onSave={(v) => handleFinancialFieldUpdate(i, 'addOnCost', v)} 
+                                                            isNumeric 
+                                                        /></>
+                                                    )}
+                                                </td>
                                             </tr>
                                             <tr className="border-b border-gray-200">
                                                 <td className="p-4 border-r border-gray-200 font-medium">Net Payable Amount (Category Total)</td>
-                                                <td className="p-4 border-r border-gray-200 text-center">INR {adultSubtotal.toLocaleString('en-IN')} <span className="text-sm text-gray-500">(x{adultCount})</span></td>
+                                                <td className="p-4 border-r border-gray-200 text-center">
+                                                    INR {adultSubtotal.toLocaleString('en-IN')} 
+                                                    <span className="text-sm text-gray-500"> (x</span>
+                                                    <EditableField 
+                                                        value={adultCount} 
+                                                        onSave={(v) => {
+                                                            const newPax = parseInt(v) || 1;
+                                                            handleUpdate('paxCount', newPax);
+                                                        }} 
+                                                        isNumeric 
+                                                        className="text-sm font-bold text-blue-700"
+                                                    />
+                                                    <span className="text-sm text-gray-500">)</span>
+                                                </td>
                                                 <td className="p-4 text-center">{child ? `INR ${childSubtotal.toLocaleString('en-IN')} (x1)` : "-"}</td>
                                             </tr>
                                             <tr className="bg-red-50 border-t-2 border-red-200">
@@ -703,7 +1004,7 @@ const QuotationPreview: React.FC<QuotationPreviewProps> = ({
                     </div>
 
 
-                    <div className="space-y-4 p-8 bg-gray-900 rounded-xl border border-gray-700 mb-10 text-white" style={{ fontSize: '15pt' }}>
+                    <div className="space-y-4 p-8 bg-gray-900 rounded-xl border border-gray-700 mb-10 text-white" style={{ fontSize: '17pt' }}>
                         <p className="flex justify-between items-center">
                             <span>💰 Total Package Cost (Group):</span>
                             <span className="font-bold text-green-400 text-2xl">₹ <EditableField value={totalAmount} onSave={v => handleUpdate('totalAmount', Number(v))} isNumeric />/-</span>
@@ -727,8 +1028,8 @@ const QuotationPreview: React.FC<QuotationPreviewProps> = ({
                         </p>
                     </div>
 
-                    <h3 className="text-2xl font-bold mb-6 text-gray-800 border-b-4 border-red-500 pb-1 w-fit" style={{ fontSize: '16pt' }}>❌ Exclusions</h3>
-                    <ul className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10" style={{ fontSize: '13pt' }}>
+                    <h3 className="text-2xl font-bold mb-6 text-gray-800 border-b-4 border-red-500 pb-1 w-fit" style={{ fontSize: '18pt' }}>❌ Exclusions</h3>
+                    <ul className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10" style={{ fontSize: '15pt' }}>
                         {data.exclusions && data.exclusions.map((exclusion, index) => (
                             <li key={index} className="flex items-start bg-red-50 p-3 rounded-lg border border-red-100 text-gray-800">
                                 <span className="mr-3 text-red-600 font-bold text-lg">✕</span>
@@ -737,7 +1038,7 @@ const QuotationPreview: React.FC<QuotationPreviewProps> = ({
                         ))}
                     </ul>
 
-                    <div className="bg-gray-100 p-8 rounded-2xl border-2 border-gray-200 mb-10 text-gray-800" style={{ fontSize: '14pt' }}>
+                    <div className="bg-gray-100 p-8 rounded-2xl border-2 border-gray-200 mb-10 text-gray-800" style={{ fontSize: '16pt' }}>
                         <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3">
                             🏦 Payment Transfer Details
                         </h3>
@@ -769,32 +1070,48 @@ const QuotationPreview: React.FC<QuotationPreviewProps> = ({
                         </div>
                     </div>
 
-                    <div className="space-y-6 text-center text-gray-800 mt-16" style={{ fontSize: '14pt' }}>
+                    <div className="space-y-6 text-center text-gray-800 mt-16" style={{ fontSize: '16pt' }}>
                         <p className="italic text-gray-500">📞 For further details or booking confirmation, feel free to contact us anytime.</p>
                         <p className="font-bold text-xl">💌 Best Regards,</p>
-                        <p className="font-black text-3xl text-blue-900 tracking-tight">{paymentDetails.accountHolder}</p>
+                        <p className="font-black text-3xl text-blue-900 tracking-tight">Vishwanathan | +91-8884016046 |</p>
                         <p className="text-blue-700 font-bold">{paymentDetails.gpayNumber}</p>
 
                         <div className="flex justify-center gap-6 mt-6">
                             <a href="tel:8884016046" className="hover:scale-105 transition">
-                                <img src="https://res.cloudinary.com/dnauowwb0/image/upload/v1767504923/Call-Now-Button_gq6urr.png" alt="Call Now" className="h-12" />
+                                <img src="https://res.cloudinary.com/dnauowwb0/image/upload/v1767504923/Call-Now-Button_gq6urr.png" alt="Call Now" className="h-16" />
                             </a>
-                            <a href="https://wa.me/918884016046" target="_blank" rel="noopener noreferrer" className="hover:scale-105 transition">
-                                <img src="https://res.cloudinary.com/dnauowwb0/image/upload/v1767504923/Whatsapp-Button_kuwlcf.png" alt="WhatsApp" className="h-12" />
+                            <a href="https://wa.me/8884016046" target="_blank" rel="noopener noreferrer" className="hover:scale-105 transition">
+                                <img src="https://res.cloudinary.com/dnauowwb0/image/upload/v1767504923/Whatsapp-Button_kuwlcf.png" alt="WhatsApp" className="h-20" />
                             </a>
                         </div>
                     </div>
 
-                    <div className="text-center text-gray-600 mt-20 pt-10 border-t-2 border-gray-100" style={{ fontSize: '12pt' }}>
+                    <div className="text-center text-gray-600 mt-20 pt-10 border-t-2 border-gray-100" style={{ fontSize: '14pt' }}>
                         <p className="font-lexend font-bold italic">
-                            🤝In <span className="underline">collaboration</span> with our trusted partners at <span className="underline bg-yellow-400 text-black px-2 rounded">TripExplore</span> – crafting seamless travel experiences together.
+                            🤝In <span className="underline font-bold" style={{ backgroundColor: 'yellow', color: 'black', padding: '0 4px' }}>collaboration</span> with our trusted partners at TripExplore – crafting seamless travel experiences together.
                         </p>
                         <p className="mt-3">
-                            🔗 Website: <a href="http://www.tripexplore.in" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-bold">www.tripexplore.in</a>
+                            🔗 Website: <a href="https://www.tripexplore.in" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-bold">www.tripexplore.in</a>
                         </p>
                     </div>
 
                     <img src={HEADER_IMG_URL} alt="Footer Banner" className="w-full mt-10 rounded-b-md" style={{ maxHeight: '120px', objectFit: 'cover' }} />
+
+                    {/* TCS Rules Section */}
+                    <div className="mt-12 p-8 bg-gray-50 border border-gray-200 rounded-xl text-gray-800" style={{ fontSize: '14pt' }}>
+                        <h3 className="text-xl font-bold mb-4">TCS Rules</h3>
+                        <p className="mb-4"><strong>Note:</strong> Effective 01 October 2023, Tax Collected at Source (TCS) shall be applicable as follows for Overseas Tour Packages / Cruises:</p>
+                        <ul className="list-disc pl-8 space-y-2 mb-6">
+                            <li>5% TCS on cumulative payments up to ₹7,00,000</li>
+                            <li>20% TCS on amounts exceeding ₹7,00,000</li>
+                        </ul>
+                        <p className="mb-4">This limit applies to all cumulative payments made against a PAN within the same Financial Year. The buyer is required to furnish an undertaking declaring their total spends on overseas tour packages/cruises during the financial year.</p>
+                        <p className="mb-4">The Government of India, Ministry of Finance, via Circular No. 10 of 2023 (F. No. 370142/12/2023-TPL) dated 30 June 2023, has clarified that:</p>
+                        <ul className="list-disc pl-8 space-y-2">
+                            <li>The undertaking must be furnished by the buyer</li>
+                            <li>Any false declaration will attract appropriate action under the Finance Act, 2023, as per the amended sub-section (1G) of Section 206C of the Income-tax Act, 1961</li>
+                        </ul>
+                    </div>
                 </div>
 
                 {/* History Sidebar */}

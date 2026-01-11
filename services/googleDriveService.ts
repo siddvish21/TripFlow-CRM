@@ -117,7 +117,7 @@ const ensureClientReady = async () => {
 }
 
 // Global helper for fetch-based Google API calls to avoid brittle XD3 transport
-const fetchGoogleApi = async (url: string, options: RequestInit = {}) => {
+export const fetchGoogleApi = async (url: string, options: RequestInit = {}) => {
     await ensureClientReady();
     const token = gapi.client.getToken().access_token;
     
