@@ -359,18 +359,28 @@ const QuotationPreview: React.FC<QuotationPreviewProps> = ({
                 throw new Error(`Failed to generate DOCX: ${docxError?.message || 'Unknown error during document generation'}`);
             }
 
-            // Generate file name: Quotation - [Customer Name] - [Date]
-            // Sanitize customer name to remove invalid characters for file names
-            const sanitizedName = data.customerName.replace(/[<>:"/\\|?*]/g, '_').trim();
-            const dateStr = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
-            const fileName = `Quotation - ${sanitizedName} - ${dateStr}.docx`;
+            // Generate file name: [Customer Name]_[Destination]_[Duration].docx
+            
+            // Helper to sanitize filenames: collapse invalid chars and spaces into single underscore
+            const sanitize = (s: string) => s.replace(/[<>:"/\\|?*\s]+/g, '_').replace(/^_+|_+$/g, '');
+
+            let cName = data.customerName;
+            if (!/^(Mr|Ms|Mrs|Dr|Prof)\.?\s/i.test(cName)) {
+                cName = "Mr./Ms. " + cName;
+            }
+
+            const sanitizedName = sanitize(cName);
+            const sanitizedDest = sanitize(data.destination || "Destination");
+            const sanitizedDur = sanitize(data.duration || "Duration");
+            
+            const fileName = `${sanitizedName}_${sanitizedDest}_${sanitizedDur}.docx`;
             const uploadResult = await uploadFileToDrive(folderId, docxBlob, fileName);
 
             // Upload Excel as a companion file
             try {
                 if (financialState) {
                     const excelBlob = await generateQuotationExcelFromTemplate(financialState, data.customerName);
-                    const excelFileName = `Financials_${data.customerName.replace(/\s+/g, '_')}.xlsx`;
+                    const excelFileName = `Financials_${fileName.replace('.docx', '.xlsx')}`;
                     await uploadFileToDrive(folderId, excelBlob, excelFileName);
                     console.log('✅ Excel Sheet generated and uploaded to Drive');
                 }
@@ -783,24 +793,46 @@ const QuotationPreview: React.FC<QuotationPreviewProps> = ({
                                 <h3 className="text-2xl font-bold mb-6 text-gray-800 border-b-4 border-blue-500 pb-2 w-fit" style={{ fontSize: '18pt' }}>💰 Package Cost Summary</h3>
                                 <div className="space-y-4">
                                     {financials.map((opt: any, i: number) => {
-                                        // Get pax count from financialState if available, otherwise use data.paxCount
-                                        const paxFromFinancials = financialState?.configs?.block1?.pax || financialState?.configs?.block2?.pax || financialState?.configs?.block3?.pax || data.paxCount;
-                                        const costPerHead = opt.netCostPerPerson + opt.addOnCost;
-                                        const totalCostForPax = costPerHead * paxFromFinancials;
+                                        // Calculate separate rates (Base + Markup + AddOns)
+                                        const adultBaseTotal = (opt.landBaseCost + opt.addOnCost);
+                                        const child = opt.childCosts && opt.childCosts.length > 0 ? opt.childCosts[0] : null;
+                                        const childBaseTotal = child ? (child.landBaseCost + opt.addOnCost) : 0;
+                                        
+                                        // Pax counts
+                                        // Use data.adultsCount/childrenCount for splitting, defaulting to total if not split
+                                        const adults = data.adultsCount || data.paxCount; 
+                                        const children = data.childrenCount || 0;
                                         
                                         return (
                                             <div key={i} className="bg-white rounded-lg p-4 border border-blue-300">
                                                 <h4 className="font-bold text-lg mb-3 text-gray-800">{opt.label || `Option ${i + 1}`}</h4>
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                
+                                                {/* Adult Row */}
+                                                <div className="flex justify-between items-center mb-2">
                                                     <div>
-                                                        <p className="text-gray-600 text-sm mb-1">Cost Per Head</p>
-                                                        <p className="font-bold text-xl text-blue-900">INR {costPerHead.toLocaleString('en-IN')}</p>
+                                                        <p className="text-gray-600 text-sm">Base Rate Per Adult (Excl. Tax)</p>
+                                                        <p className="font-bold text-xl text-blue-900">INR {adultBaseTotal.toLocaleString('en-IN')}</p>
                                                     </div>
-                                                    <div>
-                                                        <p className="text-gray-600 text-sm mb-1">Total Cost for <EditableField value={paxFromFinancials} onSave={(v) => handleUpdate('paxCount', parseInt(v) || 1)} isNumeric className="font-bold" /> Pax</p>
-                                                        <p className="font-bold text-xl text-green-700">INR {totalCostForPax.toLocaleString('en-IN')}</p>
+                                                    <div className="text-right">
+                                                        <p className="text-gray-500 text-xs text-right">x {adults} Adults</p>
+                                                        <p className="font-bold text-gray-700">INR {(adultBaseTotal * adults).toLocaleString('en-IN')}</p>
                                                     </div>
                                                 </div>
+
+                                                {/* Child Row (if applicable) */}
+                                                {child && children > 0 && (
+                                                     <div className="flex justify-between items-center mb-2 border-t border-dashed border-gray-200 pt-2">
+                                                        <div>
+                                                            <p className="text-gray-600 text-sm">Base Rate Per Child (Excl. Tax)</p>
+                                                            <p className="font-bold text-xl text-blue-900">INR {childBaseTotal.toLocaleString('en-IN')}</p>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <p className="text-gray-500 text-xs text-right">x {children} Children</p>
+                                                            <p className="font-bold text-gray-700">INR {(childBaseTotal * children).toLocaleString('en-IN')}</p>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                
                                                 <div className="mt-4 pt-4 border-t border-blue-200">
                                                     <p className="text-gray-700 text-sm italic">GST additional at 5% and is subject to RBI regulations.</p>
                                                 </div>
@@ -830,14 +862,14 @@ const QuotationPreview: React.FC<QuotationPreviewProps> = ({
                     <div className="space-y-12">
                         {financials.map((opt, i) => {
                             const child = opt.childCosts && opt.childCosts.length > 0 ? opt.childCosts[0] : null;
-                            // Get pax count from financialState (financials tab) if available, otherwise use data.paxCount
-                            const paxFromFinancials = financialState?.configs?.block1?.pax || 
-                                                      financialState?.configs?.block2?.pax || 
-                                                      financialState?.configs?.block3?.pax || 
-                                                      data.paxCount;
-                            const adultCount = paxFromFinancials;
+                            
+                            // Use quotation data for counts (Preview Mode priority)
+                            // If user edits "x 5" in preview, it updates data.adultsCount/paxCount, so we should read from there.
+                            const adultCount = data.adultsCount || data.paxCount || 1;
+                            const childCount = data.childrenCount || 0;
+
                             const adultSubtotal = (opt.netCostPerPerson + opt.addOnCost) * adultCount;
-                            const childSubtotal = child ? (child.netCost + opt.addOnCost) * 1 : 0;
+                            const childSubtotal = child ? (child.netCost + opt.addOnCost) * childCount : 0;
                             const grandTotal = adultSubtotal + childSubtotal;
 
                             return (
@@ -983,14 +1015,36 @@ const QuotationPreview: React.FC<QuotationPreviewProps> = ({
                                                         value={adultCount} 
                                                         onSave={(v) => {
                                                             const newPax = parseInt(v) || 1;
-                                                            handleUpdate('paxCount', newPax);
+                                                            // Logic: If adultsCount exists, update it. Else update paxCount.
+                                                            if (data.adultsCount !== undefined) {
+                                                                handleUpdate('adultsCount', newPax);
+                                                            } else {
+                                                                handleUpdate('paxCount', newPax);
+                                                            }
                                                         }} 
                                                         isNumeric 
                                                         className="text-sm font-bold text-blue-700"
                                                     />
                                                     <span className="text-sm text-gray-500">)</span>
                                                 </td>
-                                                <td className="p-4 text-center">{child ? `INR ${childSubtotal.toLocaleString('en-IN')} (x1)` : "-"}</td>
+                                                <td className="p-4 text-center">
+                                                    {child ? (
+                                                        <>
+                                                            INR {childSubtotal.toLocaleString('en-IN')} 
+                                                            <span className="text-sm text-gray-500"> (x</span>
+                                                            <EditableField 
+                                                                value={childCount} 
+                                                                onSave={(v) => {
+                                                                    const newIn = parseInt(v) || 0;
+                                                                    handleUpdate('childrenCount', newIn);
+                                                                }} 
+                                                                isNumeric 
+                                                                className="text-sm font-bold text-blue-700"
+                                                            />
+                                                            <span className="text-sm text-gray-500">)</span>
+                                                        </>
+                                                    ) : "-"}
+                                                </td>
                                             </tr>
                                             <tr className="bg-red-50 border-t-2 border-red-200">
                                                 <td colSpan={2} className="p-4 text-right font-bold text-gray-700 uppercase tracking-wide">Grand Total (Inc. Taxes)</td>

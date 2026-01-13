@@ -273,31 +273,78 @@ const FinancialCalculator: React.FC<FinancialCalculatorProps> = ({
       if (onUpdateQuotation) {
           const options: FinancialOption[] = [];
           
-          // Helper to create option with Child Data
-          const addOptionIfValid = (block: any, config: BlockConfig, label: string) => {
+          const processBlock = (block: any, config: BlockConfig, blockId: string, label: string) => {
                if (block.grandTotal > 0) {
-                   const pax = config.pax || 1;
+                   // 1. Calculate Child Component Quantities
+                   // We need to know how many children total to subtract from Total Pax to get Adult Pax
+                   // We iterate through the rows used in this block calculation
+                   let totalChildPax = 0;
+                   let totalChildRawCost = 0; // Cost before Markup
                    
-                   // CRITICAL: Calculate Adult Rate by subtracting total Child Costs from Grand Total?
-                   // No, the "Per Person" derived here is an Average. 
-                   // But since we are showing "Per Child" separately, the "Per Adult" should likely be the Adult rows sum.
-                   // For now, let's keep the standard "Per Person" as the base Adult Rate unless we implement strict row tagging.
-                   // Given the structure, we'll pass the Average as Base, but include Child details for separate display.
+                   // Helper to check child row
+                   const isChildRow = (label: string) => {
+                       const l = label.toLowerCase();
+                       return l.includes('child') || l.includes('cwb') || l.includes('cnb');
+                   };
+                   
+                   // Determine column keys based on block
+                   let qtyKey: keyof CalculatorRow = 'colC';
+                   let totalKey: string = 'colG';
+                   if (blockId === 'block2') { qtyKey = 'colL'; totalKey = 'colP'; }
+                   if (blockId === 'block3') { qtyKey = 'colU'; totalKey = 'colY'; }
+
+                   calculatedData.rows.forEach(r => {
+                       if (isChildRow(r.label)) {
+                           // @ts-ignore
+                           totalChildPax += (r[qtyKey] || 0);
+                           // @ts-ignore
+                           totalChildRawCost += (r[totalKey] || 0);
+                       }
+                   });
+
+                   const totalPax = config.pax;
+                   const adultPax = Math.max(1, totalPax - totalChildPax); // Safety: at least 1 divisor
+
+                   // 2. Derive Adult Costs
+                   // Total Block Raw Cost (SubTotal of rows) - Total Child Raw Cost = Total Adult Raw Cost
+                   const totalAdultRawCost = block.subTotal - totalChildRawCost;
+                   
+                   // Apply Markup to Adult Component
+                   const adultMarkupAmount = totalAdultRawCost * (config.markupPct / 100);
+                   const adultBaseWithMarkup = totalAdultRawCost + adultMarkupAmount;
+                   
+                   // Apply Taxes to Adult Component
+                   const adultGST = adultBaseWithMarkup * (config.gstPct / 100);
+                   const adultCostWithGST = adultBaseWithMarkup + adultGST;
+                   const adultTCS = adultCostWithGST * (config.tcsPct / 100);
+                   const adultNetCost = adultCostWithGST + adultTCS;
+
+                   // Per Adult Values
+                   const adultBasePerPerson = adultBaseWithMarkup / adultPax;
+                   const adultGSTPerPerson = adultGST / adultPax;
+                   const adultTCSPerPerson = adultTCS / adultPax;
+                   const adultTotalPerPerson = adultNetCost / adultPax;
+                   
+                   // AddOns are usually per person (Adult/Child same), so we add them flat
+                   const addOnCostPerPax = block.addOnsTotal / totalPax; 
                    
                    options.push({
                        label: label,
-                       landBaseCost: block.amountWithMarkup / pax,
-                       landGST: block.gstAmount / pax,
-                       landTCS: block.tcsAmount / pax,
-                       addOnCost: block.addOnsTotal / pax,
-                       childCosts: block.childCosts // New: Pass extracted child costs
+                       landBaseCost: Math.round(adultBasePerPerson),
+                       landGST: Math.round(adultGSTPerPerson),
+                       landTCS: Math.round(adultTCSPerPerson),
+                       addOnCost: Math.round(addOnCostPerPax),
+                       // Extracted Net Cost serves as the "Net Package Cost" anchor, 
+                       // we set it to the full adult total (Base+GST+TCS) to ensure table math works.
+                       extractedNetCost: Math.round(adultTotalPerPerson), 
+                       childCosts: block.childCosts // These are already per-child unit from financialCalculations
                    });
                }
           };
 
-          addOptionIfValid(calculatedData.block1, configs.block1, "Option 1");
-          addOptionIfValid(calculatedData.block2, configs.block2, "Option 2");
-          addOptionIfValid(calculatedData.block3, configs.block3, "Option 3");
+          processBlock(calculatedData.block1, configs.block1, 'block1', "Option 1");
+          processBlock(calculatedData.block2, configs.block2, 'block2', "Option 2");
+          processBlock(calculatedData.block3, configs.block3, 'block3', "Option 3");
 
           if (options.length === 0) {
               options.push({ label: "Option 1", landBaseCost: 0, landGST: 0, landTCS: 0, addOnCost: 0 });

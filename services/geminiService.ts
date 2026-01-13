@@ -864,3 +864,39 @@ export const parsePaymentImage = async (imageFile: File): Promise<any> => {
     }
 };
 
+export const generateTestimonialFeedback = async (destination: string, emphasis: string): Promise<string[]> => {
+    const prompt = `
+    Generate 3 distinct, heartfelt, and professional client testimonials for a trip to ${destination}.
+    
+    Emphasis: ${emphasis || "General satisfaction, great planning, smooth experience"}.
+
+    Guidelines:
+    - Length: Short and punchy (Max 25-30 words).
+    - Tone: Natural, simple, and grateful. Avoid overly complex or flowery language.
+    - Style: Use everyday spoken English.
+    - Format: Return strictly a JSON array of strings.
+    - Example: ["Our trip to Bali was clear! Everything was seamless. Highly recommended!", "Hotel and food were amazing. Thanks for the support.", "Best trip ever. Very well planned."]
+    `;
+
+    try {
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+            },
+        });
+        
+        const text = response.text?.trim() || "[]";
+        const cleanText = text.replace(/```json/g, '').replace(/```/g, '');
+        return JSON.parse(cleanText);
+    } catch (e) {
+        console.error("Testimonial generation failed", e);
+        return [
+            `Our trip to ${destination} was absolutely wonderful. Thank you for the seamless planning!`,
+            `Highly recommend for any ${destination} trip. Everything was perfect.`,
+            `A memorable experience in ${destination}. Great service and support throughout.`
+        ];
+    }
+};
+

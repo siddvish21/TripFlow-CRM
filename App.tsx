@@ -9,10 +9,14 @@ import {
     VendorParsedData,
     FinancialBreakdown,
     QuotationSnapshot,
-    FinancialOption
+    FinancialOption,
+    TestimonialState,
+    PaymentBankDetails, // Added this since it was missing in import but used in code
+    UserSettings        // Added this too
 } from './types';
 import Header from './components/Header';
 import Dashboard from './components/Dashboard';
+
 import QuotationForm from './components/QuotationForm';
 import QuotationPreview from './components/QuotationPreview';
 import FinancialCalculator from './components/FinancialCalculator';
@@ -20,10 +24,11 @@ import PaymentSummary from './components/PaymentSummary';
 import VendorEmailGenerator from './components/VendorEmailGenerator';
 import PaymentReceiptGenerator from './components/PaymentReceiptGenerator';
 import QuotationAIAssistant from './components/QuotationAIAssistant';
+import TestimonialGenerator from './components/TestimonialGenerator';
 
 import QuoteSummary from './components/QuoteSummary';
 import PaymentSettings from './components/PaymentSettings';
-import { PaymentBankDetails, UserSettings } from './types';
+// import { PaymentBankDetails, UserSettings } from './types'; // Removed duplicate
 import { generateQuotationFromText, parseExistingQuotationText, parseFinancialImage } from './services/geminiService';
 import { createDocx } from './services/docxGenerator';
 import { generateFinancialExcel, generateQuotationExcelFromTemplate } from './services/excelGenerator';
@@ -32,7 +37,6 @@ import { extractTextFromDocx } from './services/importService';
 import { listFiles, findFolder, ensureFolderStructure } from './services/googleDriveService';
 import FileSaver from 'file-saver';
 
-// Initial States
 const initialPaymentBankDetails: PaymentBankDetails = {
     accountHolder: 'Vishwanathan | +91-8884016046 |',
     accountNumber: '2612421112',
@@ -82,10 +86,19 @@ const initialEmailState: EmailState = {
     // linkedThreadId and cachedThread are undefined by default
 };
 
+const initialTestimonialState: TestimonialState = {
+    currentClientName: '',
+    currentDestination: '',
+    currentFeedback: '',
+    currentImage: null,
+    history: []
+};
+
+
 const App: React.FC = () => {
     // Navigation & View State
     const [view, setView] = useState<'dashboard' | 'workspace'>('dashboard');
-    const [activeTab, setActiveTab] = useState<'quotation' | 'financials' | 'payment' | 'receipt' | 'email' | 'summary' | 'templates'>('quotation');
+    const [activeTab, setActiveTab] = useState<'quotation' | 'financials' | 'payment' | 'receipt' | 'email' | 'summary' | 'templates' | 'testimonial'>('quotation');
     const [isLoading, setIsLoading] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -114,6 +127,7 @@ const App: React.FC = () => {
     const [financialState, setFinancialState] = useState<CalculatorState>(initialCalculatorState);
     const [paymentState, setPaymentState] = useState<PaymentState>(initialPaymentState);
     const [emailState, setEmailState] = useState<EmailState>(initialEmailState);
+    const [testimonialState, setTestimonialState] = useState<TestimonialState>(initialTestimonialState);
 
     // Data Flow State
     const [vendorAutoFill, setVendorAutoFill] = useState<VendorParsedData | null>(null);
@@ -218,11 +232,13 @@ const App: React.FC = () => {
                 setFinancialState(workspace.financials || initialCalculatorState);
                 setPaymentState(workspace.payment || initialPaymentState);
                 setEmailState(workspace.email || initialEmailState);
+                setTestimonialState(workspace.testimonial || initialTestimonialState);
             } else {
                 setQuotationData(null);
                 setFinancialState(initialCalculatorState);
                 setPaymentState(initialPaymentState);
                 setEmailState(initialEmailState);
+                setTestimonialState(initialTestimonialState);
                 setRawText('');
             }
 
@@ -261,7 +277,8 @@ const App: React.FC = () => {
                 quotation: quotationData,
                 financials: financialState,
                 payment: paymentState,
-                email: emailState
+                email: emailState,
+                testimonial: testimonialState
             };
 
             // Determine status based on progress
@@ -374,7 +391,15 @@ const App: React.FC = () => {
         if (!quotationData) return;
         try {
             const blob = await createDocx(quotationData, userSettings.paymentDetails);
-            FileSaver.saveAs(blob, `${quotationData.customerName.replace(/\s+/g, '_')}.docx`);
+            const sanitize = (s: string) => s.replace(/[<>:"/\\|?*\s]+/g, '_').replace(/^_+|_+$/g, '');
+            
+            let cName = quotationData.customerName;
+            if (!/^(Mr|Ms|Mrs|Dr|Prof)\.?\s/i.test(cName)) {
+                cName = "Mr./Ms. " + cName;
+            }
+
+            const fileName = `${sanitize(cName)}_${sanitize(quotationData.destination)}_${sanitize(quotationData.duration)}.docx`;
+            FileSaver.saveAs(blob, fileName);
         } catch (e) {
             console.error(e);
             alert("Failed to generate DOCX");
@@ -461,15 +486,26 @@ const App: React.FC = () => {
     };
 
     const handleDownloadExcel = async () => {
-        if (currentLead) {
+        if (currentLead && quotationData) {
+            const sanitize = (s: string) => s.replace(/[<>:"/\\|?*\s]+/g, '_').replace(/^_+|_+$/g, '');
+            const dest = quotationData.destination || "Destination";
+            const dur = quotationData.duration || "Duration";
+
+            let cName = currentLead.name;
+            if (!/^(Mr|Ms|Mrs|Dr|Prof)\.?\s/i.test(cName)) {
+                cName = "Mr./Ms. " + cName;
+            }
+
+            const fileName = `Financials_${sanitize(cName)}_${sanitize(dest)}_${sanitize(dur)}.xlsx`;
+            
             try {
                 const blob = await generateQuotationExcelFromTemplate(financialState, currentLead.name);
-                FileSaver.saveAs(blob, `Financials_${currentLead.name.replace(/\s+/g, '_')}.xlsx`);
+                FileSaver.saveAs(blob, fileName);
             } catch (e) {
                 console.error("Excel generation failed", e);
                 alert(`Failed to generate template-based Excel: ${e instanceof Error ? e.message : 'Unknown error'}. Falling back to simple format.`);
                 const blob = await generateFinancialExcel(financialState, currentLead);
-                FileSaver.saveAs(blob, `Financials_${currentLead.name.replace(/\s+/g, '_')}_Simple.xlsx`);
+                FileSaver.saveAs(blob, `Simple_${fileName}`);
             }
         }
     };
@@ -558,7 +594,8 @@ const App: React.FC = () => {
                 quotation: newData,
                 financials: financialState,
                 payment: paymentState,
-                email: emailState
+                email: emailState,
+                testimonial: testimonialState
             };
 
             await dbService.saveWorkspace(currentLead.id, workspaceData, currentLead.status);
@@ -660,7 +697,7 @@ const App: React.FC = () => {
             {/* TABS */}
             <div className="glass-nav border-b border-white/5 px-6">
                 <div className="flex space-x-8 overflow-x-auto no-scrollbar">
-                    {(['quotation', 'financials', 'payment', 'receipt', 'email', 'summary'] as const).map(tab => (
+                    {(['quotation', 'financials', 'payment', 'receipt', 'email', 'summary', 'testimonial'] as const).map(tab => (
                         <button
                             key={tab}
                             onClick={() => setActiveTab(tab)}
@@ -669,7 +706,7 @@ const App: React.FC = () => {
                                 : 'border-transparent text-gray-500 hover:text-gray-300'
                                 }`}
                         >
-                            {tab === 'receipt' ? '🧾 Receipt' : tab === 'summary' ? '📱 Summary' : tab}
+                            {tab === 'receipt' ? '🧾 Receipt' : tab === 'summary' ? '📱 Summary' : tab === 'testimonial' ? '🖼️ Testimonial' : tab}
                         </button>
                     ))}
                 </div>
@@ -768,7 +805,18 @@ const App: React.FC = () => {
                     <QuoteSummary data={quotationData} />
                 </div>
 
-
+                 {/* TESTIMONIAL TAB */}
+                 <div className={`h-full overflow-y-auto ${activeTab === 'testimonial' ? 'block' : 'hidden'}`}>
+                    <TestimonialGenerator 
+                        initialClientName={quotationData?.customerName || currentLead?.name}
+                        initialDestination={quotationData?.destination || currentLead?.destination}
+                        state={testimonialState}
+                        onChange={(newState) => {
+                            setTestimonialState(newState);
+                            setHasUnsavedChanges(true); // Flag unsaved changes
+                        }}
+                    />
+                </div>
 
 
             </main>

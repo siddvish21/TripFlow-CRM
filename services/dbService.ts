@@ -1,12 +1,12 @@
-
 import { supabase } from '../supabaseClient';
-import { Lead, CalculatorState, PaymentState, EmailState, QuotationData, Template } from '../types';
+import { Lead, CalculatorState, PaymentState, EmailState, QuotationData, Template, TestimonialState } from '../types';
 
 export interface WorkspaceData {
     quotation: QuotationData | null;
     financials: CalculatorState;
     payment: PaymentState;
     email: EmailState;
+    testimonial: TestimonialState;
 }
 
 // --- Mappers ---
@@ -126,7 +126,14 @@ export const dbService = {
             quotation: data.quotation_data,
             financials: data.financial_state,
             payment: data.payment_state,
-            email: data.email_state
+            email: data.email_state,
+            testimonial: data.testimonial_state || { 
+                currentClientName: '', 
+                currentDestination: '', 
+                currentFeedback: '', 
+                currentImage: null, 
+                history: [] 
+            }
         };
     },
 
@@ -144,6 +151,7 @@ export const dbService = {
             financial_state: data.financials,
             payment_state: data.payment,
             email_state: data.email,
+            testimonial_state: data.testimonial,
             updated_at: new Date().toISOString()
         };
 

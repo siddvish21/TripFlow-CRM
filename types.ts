@@ -267,6 +267,23 @@ export interface EmailState {
     cachedThread?: GmailThread; // Store the fetched thread conversation
 }
 
+export interface TestimonialRevision {
+    id: string; // timestamp as string
+    clientName: string;
+    destination: string;
+    feedback: string;
+    image?: string; // Base64 data if needed, or reference
+    createdAt: number;
+}
+
+export interface TestimonialState {
+    currentClientName: string;
+    currentDestination: string;
+    currentFeedback: string;
+    currentImage: string | null;
+    history: TestimonialRevision[];
+}
+
 export interface Template {
     id?: number;
     name: string;
